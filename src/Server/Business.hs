@@ -3,10 +3,12 @@
 {-# LANGUAGE TypeApplications   #-}
 
 module Business
-    ( someAccount
+    (   -- Mock values.
+      someAccount
     , someAccounts
     , somePool
     , somePools
+        -- Actions.
     , listPools
     , accountState
     , addFunds
@@ -22,34 +24,7 @@ import           Data.List
 import qualified Data.Tuple as T
 import           System.Random
 
-import Types ( Pool(..)
-             , Liq(..)
-             , mkLiq
-             , Account(..)
-             , mkAccount
-             , Asset(..)
-             , mkAsset
-             , CreatePoolParams(..)
-             , CreatePoolRes(..)
-             , AccountStateParams(..)
-             , AccountStateRes(..)
-             , mkAccountStateRes
-             , AddFundsParams(..)
-             , mkAddFundsParams
-             , AddFundsRes(..)
-             , RmFundsParams(..)
-             , mkRmFundsParams
-             , RmFundsRes(..)
-             , AddLiqParams(..)
-             , AddLiqRes(..)
-             , mkAddLiqRes
-             , RmLiqParams(..)
-             , RmLiqRes(..)
-             , mkRmLiqRes
-             , SwapParams(..)
-             , SwapRes(..)
-             , mkSwapRes
-             )
+import Types
 
 
 somePool :: Pool
@@ -67,11 +42,19 @@ somePools = [ somePool
             ]
 
 someAccount :: Account
-someAccount = mkAccount "IQ7AXV039YG60HGMUKG9SIXC67JE4U" []
+someAccount = mkAccount "IQ7AXV039YG60HGMUKG9SIXC67JE4U"
+                        [ mkAsset "ARS" 300_000
+                        , mkAsset "USD" 50_000
+                        , mkAsset "EUR" 10_000
+                        ]
 
 someAccounts :: [Account]
 someAccounts = [ someAccount
-               , mkAccount "DDF89NGNFVHUFQXGB8YP68GVGWA5CR" []
+               , mkAccount "DDF89NGNFVHUFQXGB8YP68GVGWA5CR"
+                           [ mkAsset "ARS" 30_000
+                           , mkAsset "USD" 500_000
+                           , mkAsset "EUR" 76_000
+                           ]
                ]
 
 -- GET requests.
@@ -100,17 +83,18 @@ accountState aa AccountStateParams{..} =
     Implementation": <https://github.com/runtimeverification/verified-smart-contracts/blob/c40c98d6ae35148b76742aaaa29e6eaa405b2f93/uniswap/x-y-k.pdf>
 -}
 createPool :: CreatePoolParams -> Maybe CreatePoolRes
-createPool CreatePoolParams{..} = Just $ floor
-                                       $ sqrt
-                                       $ fromInteger
-                                       $ aAmount (lAssetA cppLiq)
-                                            * aAmount (lAssetB cppLiq)
+createPool CreatePoolParams{..} =
+    Just $ mkCreatePoolRes
+         $ floor
+         $ sqrt
+         $ fromInteger
+         $ aAmount (lAssetA cppLiq) * aAmount (lAssetB cppLiq)
 
 addFunds :: Account -> AddFundsParams -> Maybe AddFundsRes
 addFunds a@Account{..} AddFundsParams{..} = addFundsAux afpFunds []
   where
     addFundsAux :: [Asset] -> [Asset] -> Maybe AddFundsRes
-    addFundsAux [] ff' = Just $ AddFundsRes $ a { aAssets = ff'}
+    addFundsAux [] ff' = Just $ mkAddFundsRes $ a { aAssets = ff'}
     addFundsAux (f : ff) ff' | aAmount f <= 0 = Nothing
                              |      otherwise =
         case find ((==) (aName f) . aName) aAssets of
@@ -249,43 +233,45 @@ rmLiq p@Pool{..} RmLiqParams{..}
 swap :: Pool -> SwapParams -> Maybe SwapRes
 swap p@Pool{..} SwapParams{..}
     | swapAForB =
-        let payOut = ceiling $ (fromIntegral $ oldAAmount * oldBAmount)
-                                    / (fromIntegral $ aAmount spAsset)
+        let payOut = ceiling $
+                        (fromIntegral $ (aAmount assetA) * (aAmount assetB))
+                            / (fromIntegral $ aAmount spAsset)
             newPool = p {pLiq = updLiq (aAmount spAsset) (-payOut) pLiq}
-        in do rm <- rfrAccount <$>
-                        (rmFunds spAccount $ mkRmFundsParams [spAsset])
-              add <- afrAccount <$>
-                         (addFunds rm $
-                             mkAddFundsParams [mkAsset (aName spAsset) payOut])
-              Just $
-                   mkSwapRes newPool add $ mkAsset (aName $ lAssetB pLiq) payOut
+        in mkRes spAsset (mkAsset (aName $ lAssetB pLiq) payOut) newPool
     | swapBForA =
-        let payOut = ceiling $ (fromIntegral $ oldAAmount * oldBAmount)
-                                    / (fromIntegral $ aAmount spAsset)
+        let payOut = ceiling $
+                        (fromIntegral $ (aAmount assetA) * (aAmount assetB))
+                            / (fromIntegral $ aAmount spAsset)
             newPool = p {pLiq = updLiq (-(aAmount spAsset)) payOut pLiq}
-        in do rm <- rfrAccount <$>
-                        (rmFunds spAccount $ mkRmFundsParams [spAsset])
-              add <- afrAccount <$>
-                         (addFunds rm $
-                             mkAddFundsParams [mkAsset (aName spAsset) payOut])
-              Just $
-                   mkSwapRes newPool add $ mkAsset (aName $ lAssetA pLiq) payOut
+        in mkRes spAsset (mkAsset (aName $ lAssetA pLiq) payOut) newPool
     | otherwise = Nothing
   where
     swapAForB :: Bool
     swapAForB = aName spAsset == aName (lAssetA pLiq)
 
-    oldAAmount :: Integer
-    oldAAmount = undefined
-
-    oldBAmount :: Integer
-    oldBAmount = undefined
+    assetA :: Asset
+    assetA = lAssetA pLiq
 
     swapBForA :: Bool
     swapBForA = aName spAsset == aName (lAssetB pLiq)
 
+    assetB :: Asset
+    assetB = lAssetB pLiq
+
     updLiq :: Integer -> Integer -> Liq -> Liq
-    updLiq a' b' l@Liq{ lAssetA = aAsset@Asset{aAmount = a}
-                      , lAssetB = bAsset@Asset{aAmount = b}
-                      } =
-       l{lAssetA = aAsset{aAmount = a + a'}, lAssetB = bAsset{aAmount = b + b'}}
+    updLiq a' b' l@Liq{ lAssetA = aAsset@Asset{ aAmount = a }
+                      , lAssetB = bAsset@Asset{ aAmount = b }
+                      }
+                 =  l { lAssetA = aAsset{ aAmount = a + a' }
+                      , lAssetB = bAsset{ aAmount = b + b' }
+                      }
+
+    mkRes :: Asset -> Asset -> Pool -> Maybe SwapRes
+    mkRes removeAsset pay newPool =
+        updAccount spAccount removeAsset pay >>= Just . mkSwapRes newPool pay
+
+    updAccount :: Account -> Asset -> Asset -> Maybe Account
+    updAccount a payment payout =
+        do a' <- rfrAccount <$> (rmFunds a $ mkRmFundsParams [payment])
+           a'' <- afrAccount <$> (addFunds a' $ mkAddFundsParams [payout])
+           Just a''

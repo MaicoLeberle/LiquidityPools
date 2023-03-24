@@ -12,23 +12,32 @@ module Types
     , Account(..)
     , mkAccount
     , SubscribeRes(..)
+        -- Create pool.
+    , CreatePoolParams(..)
+    , CreatePoolRes(..)
+    , mkCreatePoolRes
+        -- Retrieve account state.
     , AccountStateParams(..)
     , AccountStateRes(..)
     , mkAccountStateRes
-    , CreatePoolParams(..)
-    , CreatePoolRes(..)
+        -- Add funds to an account.
     , AddFundsParams(..)
     , mkAddFundsParams
     , AddFundsRes(..)
+    , mkAddFundsRes
+        -- Remove funds from an account.
     , RmFundsParams(..)
     , mkRmFundsParams
     , RmFundsRes(..)
+        -- Add liquidity from an account to a pool.
     , AddLiqParams(..)
     , AddLiqRes(..)
     , mkAddLiqRes
+        -- Remove liquidity from a pool to an account.
     , RmLiqParams(..)
     , RmLiqRes(..)
     , mkRmLiqRes
+        -- Swap liquidity at a pool.
     , SwapParams(..)
     , SwapRes(..)
     , mkSwapRes
@@ -88,7 +97,11 @@ newtype CreatePoolParams = CreatePoolParams {cppLiq :: Liq}
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 -- Represents number of LP tokens assigned to the pool creator
-type CreatePoolRes = Integer
+newtype CreatePoolRes = CreatePoolRes { cprLPTokens :: Integer }
+  deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+mkCreatePoolRes :: Integer -> CreatePoolRes
+mkCreatePoolRes = CreatePoolRes
 
 newtype AddFundsParams = AddFundsParams { afpFunds :: [Asset] }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -98,6 +111,9 @@ mkAddFundsParams = AddFundsParams
 
 newtype AddFundsRes = AddFundsRes { afrAccount :: Account }
   deriving (Eq, Show, Generic, ToJSON)
+
+mkAddFundsRes :: Account -> AddFundsRes
+mkAddFundsRes = AddFundsRes
 
 newtype RmFundsParams = RmFundsParams { rfpFunds :: [Asset] }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -148,10 +164,10 @@ data SwapParams = SwapParams
 
 data SwapRes = SwapRes
     { srPool    :: Pool
-    , srAccount :: Account
     , srAsset   :: Asset
+    , srAccount :: Account
     }
   deriving (Eq, Show, Generic, ToJSON)
 
-mkSwapRes :: Pool -> Account -> Asset -> SwapRes
+mkSwapRes :: Pool -> Asset -> Account -> SwapRes
 mkSwapRes = SwapRes
