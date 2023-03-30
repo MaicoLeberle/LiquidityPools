@@ -10,9 +10,12 @@ import Network.Wai.Handler.Warp
 
 import Servant
 
+import qualified Database.Main as DB
+
 import qualified Business as B
 import           Types    ( Pool(..)
                           , Account(..)
+                          , Password
                           , SubscribeRes
                           , AccountStateParams(..)
                           , AccountStateRes(..)
@@ -65,10 +68,10 @@ server =      createPool
 
   where
     listPools :: Handler [Pool]
-    listPools = return B.listPools
+    listPools = liftIO DB.pools >>= return
 
-    subscribe :: Handler String
-    subscribe = liftIO B.createUserID >>= return
+    subscribe :: Handler Password
+    subscribe = liftIO DB.insertUser >>= return
 
     accountState :: AccountStateParams -> Handler (Maybe AccountStateRes)
     accountState = return . B.accountState B.someAccounts

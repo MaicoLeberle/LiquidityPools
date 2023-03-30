@@ -15,6 +15,7 @@ module Business
     , addLiq
     , createPool
     , createUserID
+    , newUserID
     , rmFunds
     , rmLiq
     , swap
@@ -28,42 +29,38 @@ import Types
 
 
 somePool :: Pool
-somePool = Pool { pLiq = mkLiq (mkAsset "ARS" 3_900_000)
-                               (mkAsset "USD" 10_000)
-                , pLPTokens = 197_484
-                }
+somePool =
+    mkPool 1 (mkLiq (mkAsset ARS 3_900_000) (mkAsset USD 10_000)) 197_484
 
 somePools :: [Pool]
-somePools = [ somePool
-            , Pool { pLiq = mkLiq (mkAsset "ARS" 3_760_000)
-                                  (mkAsset "EUR" 10_000)
-                   , pLPTokens = 193_907
-                   }
-            ]
+somePools =
+    [ somePool
+    , mkPool 2 (mkLiq (mkAsset ARS 3_760_000) (mkAsset EUR 10_000)) 193_907
+    ]
 
 someAccount :: Account
 someAccount = mkAccount "IQ7AXV039YG60HGMUKG9SIXC67JE4U"
-                        [ mkAsset "ARS" 300_000
-                        , mkAsset "USD" 50_000
-                        , mkAsset "EUR" 10_000
+                        [ mkAsset ARS 300_000
+                        , mkAsset USD 50_000
+                        , mkAsset EUR 10_000
                         ]
 
 someAccounts :: [Account]
 someAccounts = [ someAccount
                , mkAccount "DDF89NGNFVHUFQXGB8YP68GVGWA5CR"
-                           [ mkAsset "ARS" 30_000
-                           , mkAsset "USD" 500_000
-                           , mkAsset "EUR" 76_000
+                           [ mkAsset ARS 30_000
+                           , mkAsset USD 500_000
+                           , mkAsset EUR 76_000
                            ]
                ]
 
 -- GET requests.
-createUserID :: IO String
-createUserID = userID 30
-  where
-    userID :: Int -> IO String
-    userID n = map (vals !!) <$> (randomChar n 0 $ length vals - 1)
+createUserID :: IO Password
+createUserID = newUserID 30
 
+newUserID :: Int -> IO String
+newUserID n = map (vals !!) <$> (randomChar n 0 $ length vals - 1)
+  where
     vals :: String
     vals = ['0'..'9'] ++ ['A'..'Z']
 
@@ -144,7 +141,7 @@ addLiq p@Pool{..} AddLiqParams{..}
                                  ])
         mkRes (pAAmount + aAAmount)
               (pBAmount + aBAmount)
-              (pLPTokens + newLPTokens)
+              (pLiqTokens + newLiqTokens)
               newAccount
   where
     unacceptableParams :: Bool
@@ -153,7 +150,7 @@ addLiq p@Pool{..} AddLiqParams{..}
                          || pAAmount /= aAAmount
                          || pBAmount /= aBAmount
 
-    pAName :: String
+    pAName :: Currency
     pAName = aName pAssetA
 
     pAAmount :: Integer
@@ -162,8 +159,13 @@ addLiq p@Pool{..} AddLiqParams{..}
     pAssetA :: Asset
     pAssetA = lAssetA pLiq
 
+    pBName :: Currency
     pBName = aName pAssetB
+
+    pBAmount :: Integer
     pBAmount = aAmount pAssetB
+
+    pAssetB :: Asset
     pAssetB = lAssetB pLiq
 
     aA = aName aAssetA
@@ -174,15 +176,15 @@ addLiq p@Pool{..} AddLiqParams{..}
     aBAmount = (aAAmount * pBAmount) `div` pAAmount
     aAssetB = lAssetB alpLiq
 
-    newLPTokens :: Integer
-    newLPTokens = (aAAmount * pLPTokens) `div` pAAmount
+    newLiqTokens :: Integer
+    newLiqTokens = (aAAmount * pLiqTokens) `div` pAAmount
 
     mkRes :: Integer -> Integer -> Integer -> Account -> Maybe AddLiqRes
     mkRes a b c =
         Just . mkAddLiqRes p {pLiq = pLiq { lAssetA = pAssetA {aAmount = a}
                                           , lAssetB = pAssetB {aAmount = b}
                                           }
-                             , pLPTokens = c
+                             , pLiqTokens = c
                              }
 
 rmLiq :: Pool -> RmLiqParams -> Maybe RmLiqRes
@@ -191,7 +193,7 @@ rmLiq p@Pool{..} RmLiqParams{..}
     |          otherwise = updAccount >>= Just . mkRmLiqRes (p {pLiq = newpLiq})
   where
     unacceptableParams :: Bool
-    unacceptableParams = rlpLPTokens < 0 || rlpLPTokens > pLPTokens
+    unacceptableParams = rlpLiqTokens < 0 || rlpLiqTokens > pLiqTokens
 
     newpLiq :: Liq
     newpLiq = pLiq { lAssetA = mkAsset (aName assetA) (availableA - rmAAmount)
@@ -205,7 +207,7 @@ rmLiq p@Pool{..} RmLiqParams{..}
     availableA = aAmount assetA
 
     rmAAmount :: Integer
-    rmAAmount = (rlpLPTokens * availableA) `div` pLPTokens
+    rmAAmount = (rlpLiqTokens * availableA) `div` pLiqTokens
 
     assetB :: Asset
     assetB = lAssetB pLiq
@@ -214,7 +216,7 @@ rmLiq p@Pool{..} RmLiqParams{..}
     availableB = aAmount assetB
 
     rmBAmount :: Integer
-    rmBAmount = (rlpLPTokens * availableB) `div` pLPTokens
+    rmBAmount = (rlpLiqTokens * availableB) `div` pLiqTokens
 
     updAccount :: Maybe Account
     updAccount =

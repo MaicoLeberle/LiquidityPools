@@ -18,10 +18,14 @@ cabal-version:       >=1.10
 executable LiquidityPoolsServer
   main-is:             Main.hs
   other-modules:         Business
+                       , Database.Main
+                       , Database.Types
                        , Server
                        , Types
   build-depends:         aeson
                        , base >=4.12 && <4.13
+                       , bytestring
+                       , postgresql-simple >=0.5 && <0.7
                        , random
                        , servant-server
                        , warp

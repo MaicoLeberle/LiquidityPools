@@ -2,15 +2,19 @@
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE RecordWildCards    #-}
+{-# LANGUAGE OverloadedStrings  #-}
 
 module Types
     ( Pool(..)
+    , mkPool
     , Liq(..)
     , mkLiq
     , Asset(..)
     , mkAsset
+    , Currency(..)
     , Account(..)
     , mkAccount
+    , Password
     , SubscribeRes(..)
         -- Create pool.
     , CreatePoolParams(..)
@@ -44,16 +48,22 @@ module Types
     ) where
 
 import Data.Aeson
+import Data.String
+import Database.PostgreSQL.Simple.FromField
 import GHC.Generics
 
 import Servant
 
 
 data Pool = Pool
-    { pLiq      :: Liq
-    , pLPTokens :: Integer
+    { pID        :: Integer
+    , pLiq       :: Liq
+    , pLiqTokens :: Integer
     }
   deriving (Eq, Show, Generic, ToJSON)
+
+mkPool :: Integer -> Liq -> Integer -> Pool
+mkPool = Pool
 
 data Liq = Liq
     { lAssetA :: Asset
@@ -65,22 +75,31 @@ mkLiq :: Asset -> Asset -> Liq
 mkLiq = Liq
 
 data Asset = Asset
-    { aName   :: String
+    { aName   :: Currency
     , aAmount :: Integer
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-mkAsset :: String -> Integer -> Asset
+mkAsset :: Currency -> Integer -> Asset
 mkAsset = Asset
 
+data Currency =
+      ARS
+    | EUR
+    | GBP
+    | USD
+  deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
 data Account = Account
-    { aUserID :: String
+    { aUserID :: Password
     , aAssets :: [Asset]
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-mkAccount :: String -> [Asset] -> Account
+mkAccount :: Password -> [Asset] -> Account
 mkAccount = Account
+
+type Password = String
 
 type SubscribeRes = String
 
@@ -97,7 +116,7 @@ newtype CreatePoolParams = CreatePoolParams {cppLiq :: Liq}
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 -- Represents number of LP tokens assigned to the pool creator
-newtype CreatePoolRes = CreatePoolRes { cprLPTokens :: Integer }
+newtype CreatePoolRes = CreatePoolRes { cprLiqTokens :: Integer }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 mkCreatePoolRes :: Integer -> CreatePoolRes
@@ -140,7 +159,7 @@ mkAddLiqRes :: Pool -> Account -> AddLiqRes
 mkAddLiqRes = AddLiqRes
 
 data RmLiqParams = RmLiqParams
-    { rlpLPTokens :: Integer
+    { rlpLiqTokens :: Integer
     , rlpAccount  :: Account
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
