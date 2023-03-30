@@ -49,7 +49,6 @@ module Types
 
 import Data.Aeson
 import Data.String
-import Database.PostgreSQL.Simple.FromField
 import GHC.Generics
 
 import Servant

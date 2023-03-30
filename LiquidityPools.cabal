@@ -40,3 +40,17 @@ executable LiquidityPoolsClient
                        , servant-server
   hs-source-dirs:      src/Client
   default-language:    Haskell2010
+
+executable populateDB
+    main-is:          Main.hs
+    hs-source-dirs:     db
+                      , src/Server
+    other-modules:      Business
+                      , Types
+    build-depends:      aeson
+                      , base >=4.12 && <4.13
+                      , containers
+                      , extra
+                      , random
+                      , servant-server
+    default-language: Haskell2010
