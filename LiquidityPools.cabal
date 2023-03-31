@@ -25,6 +25,7 @@ executable LiquidityPoolsServer
   build-depends:         aeson
                        , base >=4.12 && <4.13
                        , bytestring
+                       , containers
                        , postgresql-simple >=0.5 && <0.7
                        , random
                        , servant-server

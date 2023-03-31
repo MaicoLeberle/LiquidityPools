@@ -21,9 +21,9 @@ module Types
     , CreatePoolRes(..)
     , mkCreatePoolRes
         -- Retrieve account state.
-    , AccountStateParams(..)
-    , AccountStateRes(..)
-    , mkAccountStateRes
+    , GetAccountParams(..)
+    , GetAccountRes(..)
+    , mkGetAccountRes
         -- Add funds to an account.
     , AddFundsParams(..)
     , mkAddFundsParams
@@ -87,7 +87,7 @@ data Currency =
     | EUR
     | GBP
     | USD
-  deriving (Eq, Show, Generic, ToJSON, FromJSON)
+  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
 
 data Account = Account
     { aUserID :: Password
@@ -102,14 +102,14 @@ type Password = String
 
 type SubscribeRes = String
 
-newtype AccountStateParams = AccountStateParams { aspID :: String }
+newtype GetAccountParams = GetAccountParams { gapID :: String }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-newtype AccountStateRes = AccountStateRes { asrFunds :: [Asset] }
+newtype GetAccountRes = GetAccountRes { garAccount :: Either String Account }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-mkAccountStateRes :: [Asset] -> AccountStateRes
-mkAccountStateRes = AccountStateRes
+mkGetAccountRes :: Either String Account -> GetAccountRes
+mkGetAccountRes = GetAccountRes
 
 newtype CreatePoolParams = CreatePoolParams {cppLiq :: Liq}
   deriving (Eq, Show, Generic, ToJSON, FromJSON)

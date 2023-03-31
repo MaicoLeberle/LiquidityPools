@@ -24,6 +24,8 @@ import Business       ( createUserID
                       )
 import Database.Types ( PoolRow
                       , fromPoolRow
+                      , AccountRow
+                      , fromAccountRows
                       )
 import Types
 
@@ -54,6 +56,29 @@ insertUser =
 
     insertQuery :: Password -> Query
     insertQuery id = fromString $ "INSERT INTO user_id VALUES ('" ++ id ++ "')"
+
+getAccount :: Password -> IO (Either String Account)
+getAccount pass = bracket (connectPostgreSQL connString) close account
+  where
+    account :: Connection -> IO (Either String Account)
+    account conn = do
+        rows <- query @(Only Password) @AccountRow conn accountQuery (Only pass)
+        case fromAccountRows rows of
+            Nothing -> do userExists <- findUser
+                          if userExists then return $ Right $ mkAccount pass []
+                                        else return $ Left "Wrong user."
+            Just res -> return $ Right res
+      where
+        accountQuery :: Query
+        accountQuery = "SELECT * FROM account WHERE userID=?"
+
+        findUser :: IO Bool
+        findUser =
+            query @(Only Password) @(Only String) conn findUserQuery (Only pass)
+                >>= return . not . null
+
+        findUserQuery :: Query
+        findUserQuery = "SELECT * FROM user_id WHERE key = ?"
 
 
 -- | Auxiliary values.

@@ -10,7 +10,6 @@ module Business
     , somePools
         -- Actions.
     , listPools
-    , accountState
     , addFunds
     , addLiq
     , createPool
@@ -71,10 +70,6 @@ listPools :: [Pool]
 listPools = somePools
 
 -- POST requests.
-accountState :: [Account] -> AccountStateParams -> Maybe (AccountStateRes)
-accountState aa AccountStateParams{..} =
-    find ((==) aspID . aUserID) aa >>= Just . mkAccountStateRes . aAssets
-
 {-  The number of new LP tokens is given by the underlying theory--c.f.
     "Formal Specification of Constant Product (x * y = k) Market Maker Model and
     Implementation": <https://github.com/runtimeverification/verified-smart-contracts/blob/c40c98d6ae35148b76742aaaa29e6eaa405b2f93/uniswap/x-y-k.pdf>

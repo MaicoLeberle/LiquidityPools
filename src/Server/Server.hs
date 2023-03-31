@@ -1,4 +1,8 @@
 {-# LANGUAGE DataKinds       #-}
+{-# LANGUAGE RankNTypes      #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators   #-}
 
 module Server ( app ) where
@@ -17,8 +21,9 @@ import           Types    ( Pool(..)
                           , Account(..)
                           , Password
                           , SubscribeRes
-                          , AccountStateParams(..)
-                          , AccountStateRes(..)
+                          , GetAccountParams(..)
+                          , GetAccountRes(..)
+                          , mkGetAccountRes
                           , CreatePoolParams(..)
                           , CreatePoolRes(..)
                           , AddFundsParams(..)
@@ -42,8 +47,8 @@ type API =
                         :> Post '[JSON] (Maybe CreatePoolRes)
     :<|> "pools"        :> Get '[JSON] [Pool]
     :<|> "subscribe"    :> Get '[JSON] SubscribeRes
-    :<|> "account"      :> ReqBody '[JSON] AccountStateParams
-                        :> Post '[JSON] (Maybe AccountStateRes)
+    :<|> "account"      :> ReqBody '[JSON] GetAccountParams
+                        :> Post '[JSON] GetAccountRes
     :<|> "addLiquidity" :> ReqBody '[JSON] AddLiqParams
                         :> Post '[JSON] (Maybe AddLiqRes)
     :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
@@ -68,13 +73,14 @@ server =      createPool
 
   where
     listPools :: Handler [Pool]
-    listPools = liftIO DB.pools >>= return
+    listPools = runOnDB DB.pools
 
     subscribe :: Handler Password
-    subscribe = liftIO DB.insertUser >>= return
+    subscribe = runOnDB DB.insertUser
 
-    accountState :: AccountStateParams -> Handler (Maybe AccountStateRes)
-    accountState = return . B.accountState B.someAccounts
+    accountState :: GetAccountParams -> Handler GetAccountRes
+    accountState GetAccountParams{..} =
+        DB.getAccount gapID `runOnDBAndApply` mkGetAccountRes
 
     createPool :: CreatePoolParams -> Handler (Maybe CreatePoolRes)
     createPool = return . B.createPool
@@ -93,3 +99,11 @@ server =      createPool
 
     swap :: SwapParams -> Handler (Maybe SwapRes)
     swap = return . B.swap B.somePool
+
+
+-- | Auxiliary values.
+runOnDBAndApply :: forall a b. IO a -> (a -> b) -> Handler b
+runOnDBAndApply dbAction f = f <$> runOnDB dbAction
+
+runOnDB :: forall a b. IO a -> Handler a
+runOnDB dbAction = liftIO dbAction >>= return
