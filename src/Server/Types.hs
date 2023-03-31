@@ -27,8 +27,7 @@ module Types
         -- Add funds to an account.
     , AddFundsParams(..)
     , mkAddFundsParams
-    , AddFundsRes(..)
-    , mkAddFundsRes
+    , AddFundsRes
         -- Remove funds from an account.
     , RmFundsParams(..)
     , mkRmFundsParams
@@ -121,17 +120,16 @@ newtype CreatePoolRes = CreatePoolRes { cprLiqTokens :: Integer }
 mkCreatePoolRes :: Integer -> CreatePoolRes
 mkCreatePoolRes = CreatePoolRes
 
-newtype AddFundsParams = AddFundsParams { afpFunds :: [Asset] }
+data AddFundsParams = AddFundsParams
+    { afpPassword :: Password
+    , afpAsset :: Asset
+    }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-mkAddFundsParams :: [Asset] -> AddFundsParams
+mkAddFundsParams :: Password -> Asset -> AddFundsParams
 mkAddFundsParams = AddFundsParams
 
-newtype AddFundsRes = AddFundsRes { afrAccount :: Account }
-  deriving (Eq, Show, Generic, ToJSON)
-
-mkAddFundsRes :: Account -> AddFundsRes
-mkAddFundsRes = AddFundsRes
+type AddFundsRes = Maybe String
 
 newtype RmFundsParams = RmFundsParams { rfpFunds :: [Asset] }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)

@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE InstanceSigs       #-}
 
 module Database.Types
     ( PoolRow
@@ -9,12 +10,16 @@ module Database.Types
     ) where
 
 import Data.Aeson
-import Data.ByteString.Char8                (unpack)
+import Data.ByteString.Char8                ( ByteString
+                                            , pack
+                                            , unpack
+                                            )
 import Data.List
 import Data.String                          (IsString)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple.FromField
+import Database.PostgreSQL.Simple.ToField
 import GHC.Generics
 import Text.Read (readMaybe)
 
@@ -31,6 +36,7 @@ type PoolRow = ( Integer   -- pool ID
                )
 
 instance FromField Currency where
+    fromField :: Field -> Maybe ByteString -> Conversion Currency
     fromField f Nothing = returnError UnexpectedNull f "Unexpected null."
     fromField f (Just bs) =
         case toMaybeCurrency bs of
@@ -43,6 +49,10 @@ instance FromField Currency where
         toMaybeCurrency "GBP" = Just GBP
         toMaybeCurrency "USD" = Just USD
         toMaybeCurrency     _ = Nothing
+
+instance ToField Currency where
+    toField :: Currency -> Action
+    toField = Escape . pack . show
 
 type AccountRow = ( Currency -- Asset name
                   , Integer  -- Asset amount

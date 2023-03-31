@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications   #-}
+{-# LANGUAGE RecordWildCards    #-}
 
 module Database.Main where
 
@@ -80,6 +81,25 @@ getAccount pass = bracket (connectPostgreSQL connString) close account
 
         findUserQuery :: Query
         findUserQuery = "SELECT * FROM user_id WHERE key = ?"
+
+addFunds :: Password -> Asset -> IO (Maybe String)
+addFunds pass a@Asset{..} =
+    bracket (connectPostgreSQL connString) close addNewAsset
+  where
+    addNewAsset :: Connection -> IO (Maybe String)
+    addNewAsset conn =
+      do user <-
+            query @(Only Password) @(Only String) conn findUserQuery (Only pass)
+         if null user
+          then return $ Just $ "Unexistent user, cannot add asset " ++ show a
+          else execute conn insertQuery (aName, aAmount, pass) >> return Nothing
+
+    findUserQuery :: Query
+    findUserQuery = "SELECT * FROM user_id WHERE key = ?"
+
+    insertQuery :: Query
+    insertQuery = "INSERT INTO account VALUES (?, ?, ?)"
+
 
 
 -- | Auxiliary values.

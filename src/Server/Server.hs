@@ -91,8 +91,8 @@ server =      listPools
     -- rmLiquidity :: RmLiqParams -> Handler (Maybe RmLiqRes)
     -- rmLiquidity = return . B.rmLiq B.somePool
 
-    -- addFunds :: AddFundsParams -> Handler (Maybe AddFundsRes)
-    -- addFunds = return . B.addFunds B.someAccount
+    addFunds :: AddFundsParams -> Handler AddFundsRes
+    addFunds AddFundsParams{..} = runOnDB $ DB.addFunds afpPassword afpAsset
 
     -- rmFunds :: RmFundsParams -> Handler (Maybe RmFundsRes)
     -- rmFunds = return . B.rmFunds B.someAccount
