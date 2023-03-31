@@ -23,7 +23,6 @@ import           Types    ( Pool(..)
                           , SubscribeRes
                           , GetAccountParams(..)
                           , GetAccountRes(..)
-                          , mkGetAccountRes
                           , CreatePoolParams(..)
                           , CreatePoolRes(..)
                           , AddFundsParams(..)
@@ -79,8 +78,7 @@ server =      listPools
     subscribe = runOnDB DB.insertUser
 
     accountState :: GetAccountParams -> Handler GetAccountRes
-    accountState GetAccountParams{..} =
-        DB.getAccount gapID `runOnDBAndApply` mkGetAccountRes
+    accountState GetAccountParams{..} = runOnDB $ DB.getAccount gapID
 
     -- createPool :: CreatePoolParams -> Handler (Maybe CreatePoolRes)
     -- createPool = return . B.createPool

@@ -22,8 +22,7 @@ module Types
     , mkCreatePoolRes
         -- Retrieve account state.
     , GetAccountParams(..)
-    , GetAccountRes(..)
-    , mkGetAccountRes
+    , GetAccountRes
         -- Add funds to an account.
     , AddFundsParams(..)
     , mkAddFundsParams
@@ -104,11 +103,7 @@ type SubscribeRes = String
 newtype GetAccountParams = GetAccountParams { gapID :: String }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-newtype GetAccountRes = GetAccountRes { garAccount :: Either String Account }
-  deriving (Eq, Show, Generic, ToJSON, FromJSON)
-
-mkGetAccountRes :: Either String Account -> GetAccountRes
-mkGetAccountRes = GetAccountRes
+type GetAccountRes = Either String Account
 
 newtype CreatePoolParams = CreatePoolParams {cppLiq :: Liq}
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -164,7 +159,7 @@ data RmLiqParams = RmLiqParams
 data RmLiqRes = RmLiqRes
     {   -- Pool after this operation has taken place.
       rmrPool    :: Pool
-        -- Account performing the operation gets updated with redeemed liquidity.
+        -- Account performing the operation s updated with redeemed liquidity.
     , rmrAccount :: Account
     }
   deriving (Eq, Show, Generic, ToJSON)
