@@ -20,13 +20,14 @@ import Database.PostgreSQL.Simple
 import GHC.Generics                         (Generic)
 import Text.Read
 
-import Business       ( createUserID
-                      )
-import Database.Types ( PoolRow
-                      , fromPoolRow
-                      , AccountRow
-                      , fromAccountRows
-                      )
+import Business          ( createUserID
+                         )
+import Database.Business ( fromPoolRow
+                         , fromAccountRows
+                         )
+import Database.Types    ( PoolRow
+                         , AccountRow
+                         )
 import Types
 
 

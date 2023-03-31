@@ -18,6 +18,7 @@ cabal-version:       >=1.10
 executable LiquidityPoolsServer
   main-is:             Main.hs
   other-modules:         Business
+                       , Database.Business
                        , Database.Main
                        , Database.Types
                        , Server
