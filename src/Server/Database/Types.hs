@@ -11,9 +11,6 @@ module Database.Types
 import Data.Aeson
 import Data.ByteString.Char8                (unpack)
 import Data.List
-import Data.Map                             as M ( insertWith
-                                                 , toList
-                                                 )
 import Data.String                          (IsString)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromRow
