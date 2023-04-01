@@ -46,8 +46,8 @@ type API =
     :<|> "subscribe"    :> Get '[JSON] SubscribeRes
     :<|> "account"      :> ReqBody '[JSON] GetAccountParams
                         :> Post '[JSON] GetAccountRes
-    -- :<|> "createPool"   :> ReqBody '[JSON] CreatePoolParams
-    --                     :> Post '[JSON] (Maybe CreatePoolRes)
+    :<|> "createPool"   :> ReqBody '[JSON] CreatePoolParams
+                        :> Post '[JSON] CreatePoolRes
     -- :<|> "addLiquidity" :> ReqBody '[JSON] AddLiqParams
     --                     :> Post '[JSON] (Maybe AddLiqRes)
     -- :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
@@ -63,7 +63,7 @@ server :: Server API
 server =      listPools
          :<|> subscribe
          :<|> accountState
-         -- :<|> createPool
+         :<|> createPool
          -- :<|> addLiquidity
          -- :<|> rmLiquidity
          :<|> addFunds
@@ -80,8 +80,8 @@ server =      listPools
     accountState :: GetAccountParams -> Handler GetAccountRes
     accountState GetAccountParams{..} = runOnDB $ DB.getAccount gapID
 
-    -- createPool :: CreatePoolParams -> Handler (Maybe CreatePoolRes)
-    -- createPool = return . B.createPool
+    createPool :: CreatePoolParams -> Handler CreatePoolRes
+    createPool = runOnDB . DB.createPool
 
     -- addLiquidity :: AddLiqParams -> Handler (Maybe AddLiqRes)
     -- addLiquidity = return . B.addLiq B.somePool
@@ -93,7 +93,7 @@ server =      listPools
     addFunds AddFundsParams{..} = runOnDB $ DB.addFunds afpPassword afpAsset
 
     rmFunds :: RmFundsParams -> Handler RmFundsRes
-    rmFunds RmFundsParams{..} = runOnDB $ DB.rmFunds rfpPassword rfpAsset -- return . B.rmFunds B.someAccount
+    rmFunds RmFundsParams{..} = runOnDB $ DB.rmFunds rfpPassword rfpAsset
 
     -- swap :: SwapParams -> Handler (Maybe SwapRes)
     -- swap = return . B.swap B.somePool

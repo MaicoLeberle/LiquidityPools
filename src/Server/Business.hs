@@ -12,7 +12,7 @@ module Business
     -- , listPools
     -- , addFunds
     -- , addLiq
-    -- , createPool
+    , initialTokens
     , createUserID
     -- , newUserID
     -- , rmFunds
@@ -70,17 +70,13 @@ newUserID n = map (vals !!) <$> (randomChar n 0 $ length vals - 1)
 -- listPools = somePools
 
 -- -- POST requests.
--- {-  The number of new LP tokens is given by the underlying theory--c.f.
---     "Formal Specification of Constant Product (x * y = k) Market Maker Model and
---     Implementation": <https://github.com/runtimeverification/verified-smart-contracts/blob/c40c98d6ae35148b76742aaaa29e6eaa405b2f93/uniswap/x-y-k.pdf>
--- -}
--- createPool :: CreatePoolParams -> Maybe CreatePoolRes
--- createPool CreatePoolParams{..} =
---     Just $ mkCreatePoolRes
---          $ floor
---          $ sqrt
---          $ fromInteger
---          $ aAmount (lAssetA cppLiq) * aAmount (lAssetB cppLiq)
+{-  The number of new LP tokens is given by the underlying theory--c.f.
+    "Formal Specification of Constant Product (x * y = k) Market Maker Model and
+    Implementation": <https://github.com/runtimeverification/verified-smart-contracts/blob/c40c98d6ae35148b76742aaaa29e6eaa405b2f93/uniswap/x-y-k.pdf>
+-}
+initialTokens :: CreatePoolParams -> Integer
+initialTokens CreatePoolParams{cppLiq=Liq{lAssetA=a, lAssetB=b},..} =
+   floor $ sqrt $ fromInteger $ aAmount a * aAmount b
 
 -- addFunds :: Account -> AddFundsParams -> Maybe AddFundsRes
 -- addFunds a@Account{..} AddFundsParams{..} = addFundsAux afpFunds []

@@ -18,8 +18,7 @@ module Types
     , SubscribeRes(..)
         -- Create pool.
     , CreatePoolParams(..)
-    , CreatePoolRes(..)
-    , mkCreatePoolRes
+    , CreatePoolRes
         -- Retrieve account state.
     , GetAccountParams(..)
     , GetAccountRes
@@ -104,15 +103,14 @@ newtype GetAccountParams = GetAccountParams { gapID :: String }
 
 type GetAccountRes = Either String Account
 
-newtype CreatePoolParams = CreatePoolParams {cppLiq :: Liq}
+data CreatePoolParams = CreatePoolParams
+    { cppPassword :: Password
+    , cppLiq :: Liq
+    }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 -- Represents number of LP tokens assigned to the pool creator
-newtype CreatePoolRes = CreatePoolRes { cprLiqTokens :: Integer }
-  deriving (Eq, Show, Generic, ToJSON, FromJSON)
-
-mkCreatePoolRes :: Integer -> CreatePoolRes
-mkCreatePoolRes = CreatePoolRes
+type CreatePoolRes = Either String Integer
 
 data AddFundsParams = AddFundsParams
     { afpPassword :: Password
@@ -131,7 +129,7 @@ data RmFundsParams = RmFundsParams
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-type RmFundsRes = Maybe String
+type RmFundsRes = Either String ()
 
 data AddLiqParams = AddLiqParams
     { alpLiq     :: Liq

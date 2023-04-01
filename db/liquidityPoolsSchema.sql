@@ -13,6 +13,7 @@ CREATE TABLE account (
     asset_name currency,
     asset_amount integer,
     userID text,
+    CHECK (asset_amount > 0),
     FOREIGN KEY (userID) REFERENCES user_id(key)
 );
 
