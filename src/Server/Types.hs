@@ -28,6 +28,7 @@ module Types
     , AddFundsRes
         -- Remove funds from an account.
     , RmFundsParams(..)
+    , mkRmFundsParams
     , RmFundsRes(..)
         -- Add liquidity from an account to a pool.
     , AddLiqParams(..)
@@ -128,6 +129,9 @@ data RmFundsParams = RmFundsParams
     , rfpAsset :: Asset
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+mkRmFundsParams :: Password -> Asset -> RmFundsParams
+mkRmFundsParams = RmFundsParams
 
 type RmFundsRes = Either String ()
 

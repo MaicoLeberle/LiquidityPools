@@ -71,14 +71,15 @@ server =      listPools
          -- :<|> swap
 
   where
+      -- GET requests.
     listPools :: Handler [Pool]
     listPools = runOnDB DB.pools
 
     subscribe :: Handler Password
-    subscribe = runOnDB DB.insertUser
-
+    subscribe = runOnDB DB.createUser
+      -- POST requests.
     accountState :: GetAccountParams -> Handler GetAccountRes
-    accountState GetAccountParams{..} = runOnDB $ DB.getAccount gapID
+    accountState = runOnDB . DB.getAccount
 
     createPool :: CreatePoolParams -> Handler CreatePoolRes
     createPool = runOnDB . DB.createPool
@@ -90,18 +91,15 @@ server =      listPools
     -- rmLiquidity = return . B.rmLiq B.somePool
 
     addFunds :: AddFundsParams -> Handler AddFundsRes
-    addFunds AddFundsParams{..} = runOnDB $ DB.addFunds afpPassword afpAsset
+    addFunds = runOnDB . DB.addFunds
 
     rmFunds :: RmFundsParams -> Handler RmFundsRes
-    rmFunds RmFundsParams{..} = runOnDB $ DB.rmFunds rfpPassword rfpAsset
+    rmFunds = runOnDB . DB.rmFunds
 
     -- swap :: SwapParams -> Handler (Maybe SwapRes)
     -- swap = return . B.swap B.somePool
 
 
 -- | Auxiliary values.
-runOnDBAndApply :: forall a b. IO a -> (a -> b) -> Handler b
-runOnDBAndApply dbAction f = f <$> runOnDB dbAction
-
 runOnDB :: forall a b. IO a -> Handler a
 runOnDB dbAction = liftIO dbAction >>= return

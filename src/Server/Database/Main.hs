@@ -52,9 +52,9 @@ pools = bracket (connectPostgreSQL connString) close q
                                       , "ON liquidity_token.pool = pool.key"
                                       ]
 
-insertUser :: IO Password
-insertUser =
-    createUserID >>= bracket (connectPostgreSQL connString) close . insert
+createUser :: IO Password
+createUser =
+    B.createUserID >>= bracket (connectPostgreSQL connString) close . insert
   where
     insert :: String -> Connection -> IO Password
     insert id conn = execute_ conn (insertQ id) >> return id
@@ -62,8 +62,9 @@ insertUser =
     insertQ :: Password -> Query
     insertQ id = fromString $ "INSERT INTO user_id VALUES ('" ++ id ++ "')"
 
-getAccount :: Password -> IO GetAccountRes
-getAccount pass = bracket (connectPostgreSQL connString) close account
+getAccount :: GetAccountParams -> IO GetAccountRes
+getAccount GetAccountParams{gapID=pass} =
+    bracket (connectPostgreSQL connString) close account
   where
     account :: Connection -> IO GetAccountRes
     account conn = do
@@ -108,12 +109,12 @@ createPool cpp@CreatePoolParams { cppPassword = pass
     rollbackTrans conn err = rollback conn >> return (Left err)
 
     rmAssetA :: Connection -> IO CreatePoolRes
-    rmAssetA conn =
-        rmFunds pass aAsset >>= either (rollbackTrans conn) (rmAssetB conn)
+    rmAssetA conn = rmFunds (mkRmFundsParams pass aAsset)
+                        >>= either (rollbackTrans conn) (rmAssetB conn)
 
     rmAssetB :: Connection -> () -> IO CreatePoolRes
-    rmAssetB conn = const $
-        rmFunds pass bAsset >>= either (rollbackTrans conn) (addPool conn)
+    rmAssetB conn = const $ rmFunds (mkRmFundsParams pass bAsset)
+                                >>= either (rollbackTrans conn) (addPool conn)
 
     addPool :: Connection -> () -> IO CreatePoolRes
     addPool conn = const $
@@ -168,8 +169,8 @@ createPool cpp@CreatePoolParams { cppPassword = pass
         addTokensQ :: Query
         addTokensQ = "INSERT INTO liquidity_token_ownership VALUES (?, ?, ?)"
 
-addFunds :: Password -> Asset -> IO AddFundsRes
-addFunds pass a@Asset{..} =
+addFunds :: AddFundsParams -> IO AddFundsRes
+addFunds AddFundsParams{afpPassword = pass, afpAsset = a@Asset{..}} =
     bracket (connectPostgreSQL connString) close addNewAsset
   where
     addNewAsset :: Connection -> IO AddFundsRes
@@ -183,8 +184,9 @@ addFunds pass a@Asset{..} =
     insertQ :: Query
     insertQ = "INSERT INTO account VALUES (?, ?, ?)"
 
-rmFunds :: Password -> Asset -> IO RmFundsRes
-rmFunds pass a@Asset{..} = bracket (connectPostgreSQL connString) close rmAsset
+rmFunds :: RmFundsParams -> IO RmFundsRes
+rmFunds RmFundsParams{rfpPassword = pass, rfpAsset = a@Asset{..}} =
+    bracket (connectPostgreSQL connString) close rmAsset
   where
     rmAsset :: Connection -> IO RmFundsRes
     rmAsset conn = do
