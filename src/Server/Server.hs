@@ -52,10 +52,10 @@ type API =
     --                     :> Post '[JSON] (Maybe AddLiqRes)
     -- :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
     --                     :> Post '[JSON] (Maybe RmLiqRes)
-    -- :<|> "addFunds"     :> ReqBody '[JSON] AddFundsParams
-    --                     :> Post '[JSON] (Maybe AddFundsRes)
-    -- :<|> "rmFunds"      :> ReqBody '[JSON] RmFundsParams
-    --                     :> Post '[JSON] (Maybe RmFundsRes)
+    :<|> "addFunds"     :> ReqBody '[JSON] AddFundsParams
+                        :> Post '[JSON] AddFundsRes
+    :<|> "rmFunds"      :> ReqBody '[JSON] RmFundsParams
+                        :> Post '[JSON] RmFundsRes
     -- :<|> "swap"         :> ReqBody '[JSON] SwapParams
     --                     :> Post '[JSON] (Maybe SwapRes)
 
@@ -66,8 +66,8 @@ server =      listPools
          -- :<|> createPool
          -- :<|> addLiquidity
          -- :<|> rmLiquidity
-         -- :<|> addFunds
-         -- :<|> rmFunds
+         :<|> addFunds
+         :<|> rmFunds
          -- :<|> swap
 
   where
@@ -92,8 +92,8 @@ server =      listPools
     addFunds :: AddFundsParams -> Handler AddFundsRes
     addFunds AddFundsParams{..} = runOnDB $ DB.addFunds afpPassword afpAsset
 
-    -- rmFunds :: RmFundsParams -> Handler (Maybe RmFundsRes)
-    -- rmFunds = return . B.rmFunds B.someAccount
+    rmFunds :: RmFundsParams -> Handler RmFundsRes
+    rmFunds RmFundsParams{..} = runOnDB $ DB.rmFunds rfpPassword rfpAsset -- return . B.rmFunds B.someAccount
 
     -- swap :: SwapParams -> Handler (Maybe SwapRes)
     -- swap = return . B.swap B.somePool

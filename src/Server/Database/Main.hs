@@ -36,10 +36,10 @@ pools :: IO [Pool]
 pools = bracket (connectPostgreSQL connString) close q
   where
     q :: Connection -> IO [Pool]
-    q conn = query_ @PoolRow conn selectQuery >>= return . map fromPoolRow
+    q conn = query_ @PoolRow conn selectQ >>= return . map fromPoolRow
 
-    selectQuery :: Query
-    selectQuery = fromString $ concat [ "SELECT pool.key, "
+    selectQ :: Query
+    selectQ = fromString $ concat [ "SELECT pool.key, "
                                       ,        "pool.asset_name_a, "
                                       ,        "pool.asset_amount_a, "
                                       ,        "pool.asset_name_b, "
@@ -54,33 +54,33 @@ insertUser =
     createUserID >>= bracket (connectPostgreSQL connString) close . insert
   where
     insert :: String -> Connection -> IO Password
-    insert id conn = execute_ conn (insertQuery id) >> return id
+    insert id conn = execute_ conn (insertQ id) >> return id
 
-    insertQuery :: Password -> Query
-    insertQuery id = fromString $ "INSERT INTO user_id VALUES ('" ++ id ++ "')"
+    insertQ :: Password -> Query
+    insertQ id = fromString $ "INSERT INTO user_id VALUES ('" ++ id ++ "')"
 
 getAccount :: Password -> IO (Either String Account)
 getAccount pass = bracket (connectPostgreSQL connString) close account
   where
     account :: Connection -> IO (Either String Account)
     account conn = do
-        rows <- query @(Only Password) @AccountRow conn accountQuery (Only pass)
+        rows <- query @(Only Password) @AccountRow conn accountQ (Only pass)
         case fromAccountRows rows of
             Nothing -> do userExists <- findUser
                           if userExists then return $ Right $ mkAccount pass []
                                         else return $ Left "Wrong user."
             Just res -> return $ Right res
       where
-        accountQuery :: Query
-        accountQuery = "SELECT * FROM account WHERE userID=?"
+        accountQ :: Query
+        accountQ = "SELECT * FROM account WHERE userID=?"
 
         findUser :: IO Bool
         findUser =
-            query @(Only Password) @(Only String) conn findUserQuery (Only pass)
+            query @(Only Password) @(Only String) conn findUserQ (Only pass)
                 >>= return . not . null
 
-        findUserQuery :: Query
-        findUserQuery = "SELECT * FROM user_id WHERE key = ?"
+        findUserQ :: Query
+        findUserQ = "SELECT * FROM user_id WHERE key = ?"
 
 addFunds :: Password -> Asset -> IO (Maybe String)
 addFunds pass a@Asset{..} =
@@ -89,16 +89,49 @@ addFunds pass a@Asset{..} =
     addNewAsset :: Connection -> IO (Maybe String)
     addNewAsset conn =
       do user <-
-            query @(Only Password) @(Only String) conn findUserQuery (Only pass)
+            query @(Only Password) @(Only String) conn findUserQ (Only pass)
          if null user
           then return $ Just $ "Unexistent user, cannot add asset " ++ show a
-          else execute conn insertQuery (aName, aAmount, pass) >> return Nothing
+          else execute conn insertQ (aName, aAmount, pass) >> return Nothing
 
-    findUserQuery :: Query
-    findUserQuery = "SELECT * FROM user_id WHERE key = ?"
+    findUserQ :: Query
+    findUserQ = "SELECT * FROM user_id WHERE key = ?"
 
-    insertQuery :: Query
-    insertQuery = "INSERT INTO account VALUES (?, ?, ?)"
+    insertQ :: Query
+    insertQ = "INSERT INTO account VALUES (?, ?, ?)"
+
+rmFunds :: Password -> Asset -> IO (Maybe String)
+rmFunds pass a@Asset{..} = bracket (connectPostgreSQL connString) close rmAsset
+  where
+    rmAsset :: Connection -> IO (Maybe String)
+    rmAsset conn = do
+      assets <- query @(Currency, Password) @(Only Integer)
+                      conn findAssetQ (aName, pass)
+      case assets of
+          []           -> return $ Just "No assets to remove."
+          [Only asset] -> updateAsset conn asset aAmount
+          manyAssets   -> -- ill-formed account, first fix then remove funds.
+            let asset = foldr ((+) . fromOnly) 0 manyAssets
+            in updateAsset conn aAmount asset
+
+    findAssetQ :: Query
+    findAssetQ = fromString $ concat [ "SELECT asset_amount FROM account "
+                                     , "WHERE asset_name = ? AND userID = ?"
+                                     ]
+
+    updateAsset :: Connection -> Integer -> Integer -> IO (Maybe String)
+    updateAsset conn totalAmount rmAmount =
+        do if totalAmount <= rmAmount
+            then return $ Just $
+                    "Insufficient funds, cannot remove " ++ show rmAmount
+            else do execute @(Integer, Currency, String)
+                            conn rmQ (totalAmount - rmAmount, aName, pass)
+                    return Nothing
+
+    rmQ :: Query
+    rmQ = fromString $ concat [ "UPDATE account SET asset_amount = ? "
+                              , "WHERE asset_name = ? AND userID = ?"
+                              ]
 
 
 
