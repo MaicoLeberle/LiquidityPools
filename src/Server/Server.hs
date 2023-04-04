@@ -14,28 +14,10 @@ import Network.Wai.Handler.Warp
 
 import Servant
 
-import qualified Database.Main as DB
-
-import qualified Business as B
-import           Types    ( Pool(..)
-                          , Account(..)
-                          , Password
-                          , SubscribeRes
-                          , GetAccountParams(..)
-                          , GetAccountRes(..)
-                          , CreatePoolParams(..)
-                          , CreatePoolRes(..)
-                          , AddFundsParams(..)
-                          , AddFundsRes(..)
-                          , RmFundsParams(..)
-                          , RmFundsRes(..)
-                          , AddLiqParams(..)
-                          , AddLiqRes(..)
-                          , RmLiqParams(..)
-                          , RmLiqRes(..)
-                          , SwapParams(..)
-                          , SwapRes(..)
-                          )
+import           Business
+import qualified Database.Main  as DB
+import           Database.Types
+import           Types
 
 
 app :: Application

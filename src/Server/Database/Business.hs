@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE InstanceSigs       #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
@@ -9,7 +10,10 @@ module Database.Business
     ) where
 
 import Data.Aeson
-import Data.ByteString.Char8                (unpack)
+import Data.ByteString.Char8                ( ByteString
+                                            , pack
+                                            , unpack
+                                            )
 import Data.List
 import Data.Map                             as M ( insertWith
                                                  , toList
@@ -18,8 +22,9 @@ import Data.String                          (IsString)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromRow
 import Database.PostgreSQL.Simple.FromField
+import Database.PostgreSQL.Simple.ToField
 import GHC.Generics
-import Text.Read (readMaybe)
+import Text.Read                            (readMaybe)
 
 import Business
 import Database.Types ( PoolRow
@@ -27,6 +32,25 @@ import Database.Types ( PoolRow
                       )
 import Types
 
+
+instance FromField Currency where
+    fromField :: Field -> Maybe ByteString -> Conversion Currency
+    fromField f Nothing = returnError UnexpectedNull f "Unexpected null."
+    fromField f (Just bs) =
+        case toMaybeCurrency bs of
+            Nothing -> returnError ConversionFailed f $ "Conversion failed."
+            Just res -> return res
+      where
+        toMaybeCurrency :: (Eq p, IsString p) => p -> Maybe Currency
+        toMaybeCurrency "ARS" = Just ARS
+        toMaybeCurrency "EUR" = Just EUR
+        toMaybeCurrency "GBP" = Just GBP
+        toMaybeCurrency "USD" = Just USD
+        toMaybeCurrency     _ = Nothing
+
+instance ToField Currency where
+    toField :: Currency -> Action
+    toField = Escape . pack . show
 
 fromPoolRow :: PoolRow -> Pool
 fromPoolRow (pID, aAsset, aAmount, bAsset, bAmount, tokens) =

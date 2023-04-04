@@ -10,12 +10,9 @@ module Business
     , somePools
         -- Actions.
     -- , listPools
-    -- , addFunds
     , newTokens
     , initialTokens
     , createUserID
-    -- , newUserID
-    -- , rmFunds
     -- , rmLiq
     -- , swap
     ) where
@@ -74,35 +71,8 @@ newUserID n = map (vals !!) <$> (randomChar n 0 $ length vals - 1)
     "Formal Specification of Constant Product (x * y = k) Market Maker Model and
     Implementation": <https://github.com/runtimeverification/verified-smart-contracts/blob/c40c98d6ae35148b76742aaaa29e6eaa405b2f93/uniswap/x-y-k.pdf>
 -}
-initialTokens :: CreatePoolParams -> Integer
-initialTokens CreatePoolParams{cppLiq=Liq{lAssetA=a, lAssetB=b},..} =
-   floor $ sqrt $ fromInteger $ aAmount a * aAmount b
-
--- addFunds :: Account -> AddFundsParams -> Maybe AddFundsRes
--- addFunds a@Account{..} AddFundsParams{..} = addFundsAux afpFunds []
---   where
---     addFundsAux :: [Asset] -> [Asset] -> Maybe AddFundsRes
---     addFundsAux [] ff' = Just $ mkAddFundsRes $ a { aAssets = ff'}
---     addFundsAux (f : ff) ff' | aAmount f <= 0 = Nothing
---                              |      otherwise =
---         case find ((==) (aName f) . aName) aAssets of
---             Just f' -> addFundsAux ff $ mkAsset (aName f)
---                                                 (aAmount f' + aAmount f) : ff'
---             Nothing -> addFundsAux ff $ mkAsset (aName f) (aAmount f) : ff'
-
--- rmFunds :: Account -> RmFundsParams -> Maybe RmFundsRes
--- rmFunds a@Account{..} RmFundsParams{..} = rmFundsAux rfpFunds []
---   where
---     rmFundsAux :: [Asset] -> [Asset] -> Maybe RmFundsRes
---     rmFundsAux [] res = Just $ RmFundsRes $ a {aAssets = res}
---     rmFundsAux (f : ff) ff' | aAmount f <= 0 = Nothing
---                             |      otherwise =
---         case find ((==) (aName f) . aName) aAssets of
---             Just f' | aAmount f' < aAmount f -> Nothing
---                     |              otherwise ->
---                         rmFundsAux ff $ mkAsset (aName f)
---                                                 (aAmount f' - aAmount f ) : ff'
---             Nothing -> Nothing
+initialTokens :: Integer -> Integer -> Integer
+initialTokens newA newB = floor $ sqrt $ fromInteger $ newA * newB
 
 {-  FIX: Implement preservation of the constant factor invariant and compute the
     right number of LP tokens.

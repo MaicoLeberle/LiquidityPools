@@ -13,30 +13,42 @@ import Control.Monad.Extra                    (ifM)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
 import Control.Exception                      (bracket)
-import Control.Monad                          (void)
 import Data.Aeson
 import Data.ByteString.Char8                  ( ByteString
                                               , unpack
                                               )
 import Data.Int                               ( Int64 )
-import Data.String                            ( fromString
-                                              , IsString
-                                              )
+import Data.String                            ( fromString )
 import Database.PostgreSQL.Simple
-import Database.PostgreSQL.Simple.Transaction
 import GHC.Generics                           (Generic)
 import Text.Read
 
-import qualified Business as B
-import           Business          ( createUserID
-                                   , initialTokens
-                                   )
-import           Database.Business ( fromPoolRow
-                                   , fromAccountRows
-                                   )
-import           Database.Types    ( PoolRow
-                                   , AccountRow
-                                   )
+import qualified Business          as B ( createUserID
+                                        , initialTokens
+                                        , newTokens
+                                        )
+import           Database.Business      ( fromPoolRow
+                                        , fromAccountRows
+                                        )
+import           Database.Types         ( PoolRow(..)
+                                        , AccountRow(..)
+                                        , Transaction(..)
+                                        , CreatePoolParams(..)
+                                        , CreatePoolRes
+                                        , GetAccountParams(..)
+                                        , GetAccountRes
+                                        , AddFundsParams(..)
+                                        , AddFundsRes
+                                        , RmFundsParams(..)
+                                        , RmFundsRes(..)
+                                        , AddLiqParams(..)
+                                        , Transaction
+                                        , AddLiqRes
+                                        , RmLiqParams(..)
+                                        , RmLiqRes(..)
+                                        , SwapParams(..)
+                                        , SwapRes(..)
+                                        )
 import           Types
 
 
@@ -161,7 +173,7 @@ createPool cpp@CreatePoolParams{ cppPassword = pass
                 [(oldA, oldB, oldTokens)] ->
                     let oldLiq = mkLiq (mkAsset newAName oldA)
                                        (mkAsset newBName oldB)
-                    in  return $ B.initialTokens cpp
+                    in  return $ B.initialTokens newA newB
                 _ -> except $ Left "Error retrieving previous liquidity."
           where
             getNumberNewTokensQ :: Query
@@ -276,8 +288,9 @@ rmFunds RmFundsParams{..} = runExceptT $ rmAsset rfpPassword rfpAsset
 
 -- | Auxiliary values.
 rmAsset :: Password -> Asset -> Transaction ()
-rmAsset pass Asset{..} =
-    ExceptT $ bracket (connectPostgreSQL connString) close (runExceptT . rmAsset)
+rmAsset pass Asset{..} = ExceptT $ bracket (connectPostgreSQL connString)
+                                           close
+                                           (runExceptT . rmAsset)
   where
     rmAsset :: Connection -> Transaction ()
     rmAsset conn = findAsset conn >>= updateAsset conn aAmount
