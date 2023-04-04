@@ -32,8 +32,8 @@ module Types
     , RmFundsRes(..)
         -- Add liquidity from an account to a pool.
     , AddLiqParams(..)
-    , AddLiqRes(..)
-    , mkAddLiqRes
+    , Transaction
+    , AddLiqRes
         -- Remove liquidity from a pool to an account.
     , RmLiqParams(..)
     , RmLiqRes(..)
@@ -44,6 +44,7 @@ module Types
     , mkSwapRes
     ) where
 
+import Control.Monad.Trans.Except
 import Data.Aeson
 import Data.String
 import GHC.Generics
@@ -99,11 +100,18 @@ type Password = String
 
 type SubscribeRes = String
 
+{-| Type Transaction allows for a compact and maintainable implementation of
+    error-prone, multi-query sessions with the database backend.
+-}
+type Transaction a = ExceptT String IO a
+
+-- | account endpoint.
 newtype GetAccountParams = GetAccountParams { gapID :: String }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 type GetAccountRes = Either String Account
 
+-- | createPool endpoint.
 data CreatePoolParams = CreatePoolParams
     { cppPassword :: Password
     , cppLiq :: Liq
@@ -113,6 +121,7 @@ data CreatePoolParams = CreatePoolParams
 -- Represents number of LP tokens assigned to the pool creator
 type CreatePoolRes = Either String Integer
 
+-- | addFunds endpoint.
 data AddFundsParams = AddFundsParams
     { afpPassword :: Password
     , afpAsset :: Asset
@@ -122,8 +131,9 @@ data AddFundsParams = AddFundsParams
 mkAddFundsParams :: Password -> Asset -> AddFundsParams
 mkAddFundsParams = AddFundsParams
 
-type AddFundsRes = Maybe String
+type AddFundsRes = Either String ()
 
+-- | rmFunds endpoint.
 data RmFundsParams = RmFundsParams
     { rfpPassword :: Password
     , rfpAsset :: Asset
@@ -135,21 +145,16 @@ mkRmFundsParams = RmFundsParams
 
 type RmFundsRes = Either String ()
 
+-- | addLiquidity endpoint.
 data AddLiqParams = AddLiqParams
-    { alpLiq     :: Liq
-    , alpAccount :: Account
+    { alpPassword :: Password
+    , alpLiq     :: Liq
     }
   deriving (Eq, Show, Generic, FromJSON)
 
-data AddLiqRes = AddLiqRes
-    { alrPool    :: Pool
-    , alrAccount :: Account
-    }
-  deriving (Eq, Show, Generic, ToJSON)
+type AddLiqRes = Either String Integer
 
-mkAddLiqRes :: Pool -> Account -> AddLiqRes
-mkAddLiqRes = AddLiqRes
-
+-- | rmLiquidity endpoint.
 data RmLiqParams = RmLiqParams
     { rlpLiqTokens :: Integer
     , rlpAccount  :: Account
@@ -167,6 +172,7 @@ data RmLiqRes = RmLiqRes
 mkRmLiqRes :: Pool -> Account -> RmLiqRes
 mkRmLiqRes = RmLiqRes
 
+-- | swap endpoint.
 data SwapParams = SwapParams
     { spAsset   :: Asset
     , spAccount :: Account

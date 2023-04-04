@@ -11,7 +11,7 @@ module Business
         -- Actions.
     -- , listPools
     -- , addFunds
-    -- , addLiq
+    , newTokens
     , initialTokens
     , createUserID
     -- , newUserID
@@ -104,79 +104,38 @@ initialTokens CreatePoolParams{cppLiq=Liq{lAssetA=a, lAssetB=b},..} =
 --                                                 (aAmount f' - aAmount f ) : ff'
 --             Nothing -> Nothing
 
--- {-  FIX: Implement preservation of the constant factor invariant and compute the
---     right number of LP tokens.
---     In particular, note that we assume here that asset `aAssetA` will be added
---     entirely to the liquidity of the pool, while only an appropriate amount of
---     asset aAssetB will be added in order to preserve the constant factor
---     invariant. In some cases, however, this may not be correct direction of
---     restrictions, as we might need to proceed in the inverse direction: adding
---     the entire asset `aAssetB` and only an appropriate amount of asset `aAssetA`
---     to preserve the invariant. Consider, for example, the equation for
---     `aBAmount`, where the underlying notion of alpha, according to the
---     terminology used in the theoretical foundations for constant factor
---     automated market makers, clearly assumes that the proportion between assets
---     will be preserved simply by restricting the amount of asset `aAssetB` that
---     is effectively added. A similar incorrect approach is taken for the
---     computation of the number of new LP tokens.
--- -}
--- addLiq :: Pool -> AddLiqParams -> Maybe AddLiqRes
--- addLiq p@Pool{..} AddLiqParams{..}
---     | unacceptableParams = Nothing
---     | otherwise = do
---         newAccount <-
---             rfrAccount <$> rmFunds alpAccount
---                 (mkRmFundsParams [ aAssetA { aAmount = 0 }
---                                  , aAssetB { aAmount =
---                                                     aAmount aAssetB - aBAmount }
---                                  ])
---         mkRes (pAAmount + aAAmount)
---               (pBAmount + aBAmount)
---               (pLiqTokens + newLiqTokens)
---               newAccount
---   where
---     unacceptableParams :: Bool
---     unacceptableParams =    aAAmount < 0
---                          || aBAmount < 0
---                          || pAAmount /= aAAmount
---                          || pBAmount /= aBAmount
-
---     pAName :: Currency
---     pAName = aName pAssetA
-
---     pAAmount :: Integer
---     pAAmount = aAmount pAssetA
-
---     pAssetA :: Asset
---     pAssetA = lAssetA pLiq
-
---     pBName :: Currency
---     pBName = aName pAssetB
-
---     pBAmount :: Integer
---     pBAmount = aAmount pAssetB
-
---     pAssetB :: Asset
---     pAssetB = lAssetB pLiq
-
---     aA = aName aAssetA
---     aAAmount = aAmount aAssetA
---     aAssetA = lAssetA alpLiq
-
---     aB = aName aAssetB
---     aBAmount = (aAAmount * pBAmount) `div` pAAmount
---     aAssetB = lAssetB alpLiq
-
---     newLiqTokens :: Integer
---     newLiqTokens = (aAAmount * pLiqTokens) `div` pAAmount
-
---     mkRes :: Integer -> Integer -> Integer -> Account -> Maybe AddLiqRes
---     mkRes a b c =
---         Just . mkAddLiqRes p {pLiq = pLiq { lAssetA = pAssetA {aAmount = a}
---                                           , lAssetB = pAssetB {aAmount = b}
---                                           }
---                              , pLiqTokens = c
---                              }
+{-  FIX: Implement preservation of the constant factor invariant and compute the
+    right number of LP tokens.
+    In particular, note that we assume here that asset `aAssetA` will be added
+    entirely to the liquidity of the pool, while only an appropriate amount of
+    asset aAssetB will be added in order to preserve the constant factor
+    invariant. In some cases, however, this may not be correct direction of
+    restrictions, as we might need to proceed in the inverse direction: adding
+    the entire asset `aAssetB` and only an appropriate amount of asset `aAssetA`
+    to preserve the invariant. Consider, for example, the equation for
+    `aBAmount`, where the underlying notion of alpha, according to the
+    terminology used in the theoretical foundations for constant factor
+    automated market makers, clearly assumes that the proportion between assets
+    will be preserved simply by restricting the amount of asset `aAssetB` that
+    is effectively added. A similar incorrect approach is taken for the
+    computation of the number of new LP tokens.
+-}
+newTokens :: Liq -> Liq -> Integer -> Maybe Integer
+newTokens Liq{ lAssetA = Asset{aName = oldAName, aAmount = oldA}
+             , lAssetB = Asset{aName = oldBName, aAmount = oldB}
+             }
+          Liq{ lAssetA = Asset{aName = newAName, aAmount = newA}
+             , lAssetB = Asset{aName = newBName, aAmount = newB}
+             }
+          oldTokens
+    | wrongParams = Nothing
+    | otherwise = Just $ (newA * oldTokens) `div` oldA
+  where
+    wrongParams :: Bool
+    wrongParams =    newAName /= oldAName
+                  || newBName /= oldBName
+                  || newA < 0
+                  || newB < 0
 
 -- rmLiq :: Pool -> RmLiqParams -> Maybe RmLiqRes
 -- rmLiq p@Pool{..} RmLiqParams{..}

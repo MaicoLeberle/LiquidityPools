@@ -48,8 +48,8 @@ type API =
                         :> Post '[JSON] GetAccountRes
     :<|> "createPool"   :> ReqBody '[JSON] CreatePoolParams
                         :> Post '[JSON] CreatePoolRes
-    -- :<|> "addLiquidity" :> ReqBody '[JSON] AddLiqParams
-    --                     :> Post '[JSON] (Maybe AddLiqRes)
+    :<|> "addLiquidity" :> ReqBody '[JSON] AddLiqParams
+                        :> Post '[JSON] AddLiqRes
     -- :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
     --                     :> Post '[JSON] (Maybe RmLiqRes)
     :<|> "addFunds"     :> ReqBody '[JSON] AddFundsParams
@@ -64,7 +64,7 @@ server =      listPools
          :<|> subscribe
          :<|> accountState
          :<|> createPool
-         -- :<|> addLiquidity
+         :<|> addLiquidity
          -- :<|> rmLiquidity
          :<|> addFunds
          :<|> rmFunds
@@ -77,6 +77,7 @@ server =      listPools
 
     subscribe :: Handler Password
     subscribe = runOnDB DB.createUser
+
       -- POST requests.
     accountState :: GetAccountParams -> Handler GetAccountRes
     accountState = runOnDB . DB.getAccount
@@ -84,8 +85,8 @@ server =      listPools
     createPool :: CreatePoolParams -> Handler CreatePoolRes
     createPool = runOnDB . DB.createPool
 
-    -- addLiquidity :: AddLiqParams -> Handler (Maybe AddLiqRes)
-    -- addLiquidity = return . B.addLiq B.somePool
+    addLiquidity :: AddLiqParams -> Handler AddLiqRes
+    addLiquidity = runOnDB . DB.addLiq
 
     -- rmLiquidity :: RmLiqParams -> Handler (Maybe RmLiqRes)
     -- rmLiquidity = return . B.rmLiq B.somePool
