@@ -20,6 +20,7 @@ module Database.Types
     , RmFundsRes(..)
         -- Add liquidity from an account to a pool.
     , AddLiqParams(..)
+    , createPoolParamsToAddLiq
     , Transaction
     , AddLiqRes
         -- Remove liquidity from a pool to an account.
@@ -102,20 +103,21 @@ data AddLiqParams = AddLiqParams
 
 type AddLiqRes = Either String Integer
 
+-- | Note that CreatePoolParams are isomorphic to AddLiqParams
+createPoolParamsToAddLiq :: CreatePoolParams -> AddLiqParams
+createPoolParamsToAddLiq cpp = AddLiqParams { alpPassword = cppPassword cpp
+                                            , alpLiq = cppLiq cpp
+                                            }
+
 -- | rmLiquidity endpoint.
 data RmLiqParams = RmLiqParams
-    { rlpLiqTokens :: Integer
-    , rlpAccount  :: Account
+    { rlpPass   :: Password
+    , rlpPoolID :: Integer
+    , rlpTokens :: Integer
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-data RmLiqRes = RmLiqRes
-    {   -- Pool after this operation has taken place.
-      rmrPool    :: Pool
-        -- Account performing the operation s updated with redeemed liquidity.
-    , rmrAccount :: Account
-    }
-  deriving (Eq, Show, Generic, ToJSON)
+type RmLiqRes = Either String Liq
 
 -- | swap endpoint.
 data SwapParams = SwapParams

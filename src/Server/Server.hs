@@ -32,8 +32,8 @@ type API =
                         :> Post '[JSON] CreatePoolRes
     :<|> "addLiquidity" :> ReqBody '[JSON] AddLiqParams
                         :> Post '[JSON] AddLiqRes
-    -- :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
-    --                     :> Post '[JSON] (Maybe RmLiqRes)
+    :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
+                        :> Post '[JSON] RmLiqRes
     :<|> "addFunds"     :> ReqBody '[JSON] AddFundsParams
                         :> Post '[JSON] AddFundsRes
     :<|> "rmFunds"      :> ReqBody '[JSON] RmFundsParams
@@ -47,7 +47,7 @@ server =      listPools
          :<|> accountState
          :<|> createPool
          :<|> addLiquidity
-         -- :<|> rmLiquidity
+         :<|> rmLiquidity
          :<|> addFunds
          :<|> rmFunds
          -- :<|> swap
@@ -68,10 +68,10 @@ server =      listPools
     createPool = runOnDB . DB.createPool
 
     addLiquidity :: AddLiqParams -> Handler AddLiqRes
-    addLiquidity = runOnDB . DB.addLiq
+    addLiquidity = runOnDB . DB.addLiquidity
 
-    -- rmLiquidity :: RmLiqParams -> Handler (Maybe RmLiqRes)
-    -- rmLiquidity = return . B.rmLiq B.somePool
+    rmLiquidity :: RmLiqParams -> Handler RmLiqRes
+    rmLiquidity = runOnDB . DB.rmLiquidity
 
     addFunds :: AddFundsParams -> Handler AddFundsRes
     addFunds = runOnDB . DB.addFunds

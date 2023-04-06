@@ -3,17 +3,11 @@
 {-# LANGUAGE TypeApplications   #-}
 
 module Business
-    (   -- Mock values.
-      someAccount
-    , someAccounts
-    , somePool
-    , somePools
-        -- Actions.
-    -- , listPools
-    , newTokens
+    (   -- Actions.
+      newTokens
     , initialTokens
     , createUserID
-    -- , rmLiq
+    , rmLiq
     -- , swap
     ) where
 
@@ -23,32 +17,6 @@ import           System.Random
 
 import Types
 
-
-somePool :: Pool
-somePool =
-    mkPool 1 (mkLiq (mkAsset ARS 3_900_000) (mkAsset USD 10_000)) 197_484
-
-somePools :: [Pool]
-somePools =
-    [ somePool
-    , mkPool 2 (mkLiq (mkAsset ARS 3_760_000) (mkAsset EUR 10_000)) 193_907
-    ]
-
-someAccount :: Account
-someAccount = mkAccount "IQ7AXV039YG60HGMUKG9SIXC67JE4U"
-                        [ mkAsset ARS 300_000
-                        , mkAsset USD 50_000
-                        , mkAsset EUR 10_000
-                        ]
-
-someAccounts :: [Account]
-someAccounts = [ someAccount
-               , mkAccount "DDF89NGNFVHUFQXGB8YP68GVGWA5CR"
-                           [ mkAsset ARS 30_000
-                           , mkAsset USD 500_000
-                           , mkAsset EUR 76_000
-                           ]
-               ]
 
 -- GET requests.
 createUserID :: IO Password
@@ -63,10 +31,7 @@ newUserID n = map (vals !!) <$> (randomChar n 0 $ length vals - 1)
     randomChar :: Int -> Int -> Int -> IO [Int]
     randomChar n a b = sequence $ take n $ repeat $ randomRIO (a, b)
 
--- listPools :: [Pool]
--- listPools = somePools
-
--- -- POST requests.
+-- POST requests.
 {-  The number of new LP tokens is given by the underlying theory--c.f.
     "Formal Specification of Constant Product (x * y = k) Market Maker Model and
     Implementation": <https://github.com/runtimeverification/verified-smart-contracts/blob/c40c98d6ae35148b76742aaaa29e6eaa405b2f93/uniswap/x-y-k.pdf>
@@ -107,50 +72,19 @@ newTokens Liq{ lAssetA = Asset{aName = oldAName, aAmount = oldA}
                   || newA < 0
                   || newB < 0
 
--- rmLiq :: Pool -> RmLiqParams -> Maybe RmLiqRes
--- rmLiq p@Pool{..} RmLiqParams{..}
---     | unacceptableParams = Nothing
---     |          otherwise = updAccount >>= Just . mkRmLiqRes (p {pLiq = newpLiq})
---   where
---     unacceptableParams :: Bool
---     unacceptableParams = rlpLiqTokens < 0 || rlpLiqTokens > pLiqTokens
+rmLiq :: Pool -> Integer -> Liq
+rmLiq p@Pool{ pLiq = Liq { lAssetA = Asset{aName = a, aAmount = oldA}
+                         , lAssetB = Asset{aName = b, aAmount = oldB}
+                         }
+            , pLiqTokens = oldTokens
+            }
+      tokens = mkLiq (mkAsset a rmAAmount) (mkAsset b rmBAmount)
+  where
+    rmAAmount :: Integer
+    rmAAmount = (tokens * oldA) `div` oldTokens
 
---     newpLiq :: Liq
---     newpLiq = pLiq { lAssetA = mkAsset (aName assetA) (availableA - rmAAmount)
---                    , lAssetB = mkAsset (aName assetB) (availableB - rmBAmount)
---                    }
-
---     assetA :: Asset
---     assetA = lAssetA pLiq
-
---     availableA :: Integer
---     availableA = aAmount assetA
-
---     rmAAmount :: Integer
---     rmAAmount = (rlpLiqTokens * availableA) `div` pLiqTokens
-
---     assetB :: Asset
---     assetB = lAssetB pLiq
-
---     availableB :: Integer
---     availableB = aAmount assetB
-
---     rmBAmount :: Integer
---     rmBAmount = (rlpLiqTokens * availableB) `div` pLiqTokens
-
---     updAccount :: Maybe Account
---     updAccount =
---         do afr <- addFunds rlpAccount
---                            $ mkAddFundsParams [ mkAsset (aName assetA) rmAAmount
---                                               , mkAsset (aName assetB) rmBAmount
---                                               ]
---            Just $ afrAccount afr
-
---     newAssetA :: Asset
---     newAssetA = mkAsset (aName assetA) rmAAmount
-
---     newAssetB :: Asset
---     newAssetB = mkAsset (aName assetB) rmBAmount
+    rmBAmount :: Integer
+    rmBAmount = (tokens * oldB) `div` oldTokens
 
 -- swap :: Pool -> SwapParams -> Maybe SwapRes
 -- swap p@Pool{..} SwapParams{..}
