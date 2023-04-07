@@ -97,7 +97,7 @@ type RmFundsRes = Either String ()
 -- | addLiquidity endpoint.
 data AddLiqParams = AddLiqParams
     { alpPassword :: Password
-    , alpLiq     :: Liq
+    , alpLiq      :: Liq
     }
   deriving (Eq, Show, Generic, FromJSON)
 
@@ -121,14 +121,10 @@ type RmLiqRes = Either String Liq
 
 -- | swap endpoint.
 data SwapParams = SwapParams
-    { spAsset   :: Asset
-    , spAccount :: Account
+    { spPassword :: Password
+    , spAsset    :: Asset
+    , spPoolID   :: Integer
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-data SwapRes = SwapRes
-    { srPool    :: Pool
-    , srAsset   :: Asset
-    , srAccount :: Account
-    }
-  deriving (Eq, Show, Generic, ToJSON)
+type SwapRes = Either String Asset

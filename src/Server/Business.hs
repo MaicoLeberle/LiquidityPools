@@ -3,12 +3,11 @@
 {-# LANGUAGE TypeApplications   #-}
 
 module Business
-    (   -- Actions.
-      newTokens
+    ( newTokens
     , initialTokens
     , createUserID
     , rmLiq
-    -- , swap
+    , swap
     ) where
 
 import           Data.List
@@ -86,48 +85,32 @@ rmLiq p@Pool{ pLiq = Liq { lAssetA = Asset{aName = a, aAmount = oldA}
     rmBAmount :: Integer
     rmBAmount = (tokens * oldB) `div` oldTokens
 
--- swap :: Pool -> SwapParams -> Maybe SwapRes
--- swap p@Pool{..} SwapParams{..}
---     | swapAForB =
---         let payOut = ceiling $
---                         (fromIntegral $ (aAmount assetA) * (aAmount assetB))
---                             / (fromIntegral $ aAmount spAsset)
---             newPool = p {pLiq = updLiq (aAmount spAsset) (-payOut) pLiq}
---         in mkRes spAsset (mkAsset (aName $ lAssetB pLiq) payOut) newPool
---     | swapBForA =
---         let payOut = ceiling $
---                         (fromIntegral $ (aAmount assetA) * (aAmount assetB))
---                             / (fromIntegral $ aAmount spAsset)
---             newPool = p {pLiq = updLiq (-(aAmount spAsset)) payOut pLiq}
---         in mkRes spAsset (mkAsset (aName $ lAssetA pLiq) payOut) newPool
---     | otherwise = Nothing
---   where
---     swapAForB :: Bool
---     swapAForB = aName spAsset == aName (lAssetA pLiq)
+swap :: Pool -> Asset -> Maybe Asset
+swap p@Pool{..} Asset{aName = swapName, aAmount = swapAmount}
+  | swapAForB =
+    let (payOut, payOutName) =
+          ( ceiling $ (fromIntegral $ (aAmount assetA) * (aAmount assetB))
+                              / (fromIntegral swapAmount)
+          , aName $ lAssetB pLiq
+          )
+    in Just $ mkAsset payOutName payOut
+  | swapBForA =
+    let (payOut, payOutName) =
+             ( ceiling $ (fromIntegral $ (aAmount assetA) * (aAmount assetB))
+                            / (fromIntegral swapAmount)
+             , aName $ lAssetA pLiq
+             )
+    in Just $ mkAsset payOutName payOut
+  | otherwise = Nothing
+  where
+    swapAForB :: Bool
+    swapAForB = swapName == aName (lAssetA pLiq)
 
---     assetA :: Asset
---     assetA = lAssetA pLiq
+    assetA :: Asset
+    assetA = lAssetA pLiq
 
---     swapBForA :: Bool
---     swapBForA = aName spAsset == aName (lAssetB pLiq)
+    swapBForA :: Bool
+    swapBForA = swapName == aName (lAssetB pLiq)
 
---     assetB :: Asset
---     assetB = lAssetB pLiq
-
---     updLiq :: Integer -> Integer -> Liq -> Liq
---     updLiq a' b' l@Liq{ lAssetA = aAsset@Asset{ aAmount = a }
---                       , lAssetB = bAsset@Asset{ aAmount = b }
---                       }
---                  =  l { lAssetA = aAsset{ aAmount = a + a' }
---                       , lAssetB = bAsset{ aAmount = b + b' }
---                       }
-
---     mkRes :: Asset -> Asset -> Pool -> Maybe SwapRes
---     mkRes removeAsset pay newPool =
---         updAccount spAccount removeAsset pay >>= Just . mkSwapRes newPool pay
-
---     updAccount :: Account -> Asset -> Asset -> Maybe Account
---     updAccount a payment payout =
---         do a' <- rfrAccount <$> (rmFunds a $ mkRmFundsParams [payment])
---            a'' <- afrAccount <$> (addFunds a' $ mkAddFundsParams [payout])
---            Just a''
+    assetB :: Asset
+    assetB = lAssetB pLiq

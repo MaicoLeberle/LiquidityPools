@@ -28,6 +28,7 @@ import qualified Business          as B ( createUserID
                                         , initialTokens
                                         , newTokens
                                         , rmLiq
+                                        , swap
                                         )
 import           Database.Business      ( fromPoolRow
                                         , fromAccountRows
@@ -244,9 +245,10 @@ addFunds AddFundsParams{afpPassword = pass, afpAsset = a@Asset{..}} =
     bracket (connectPostgreSQL connString) close (runExceptT . addNewAsset)
   where
     addNewAsset :: Connection -> Transaction ()
-    addNewAsset conn =
-        do checkUserExists conn pass
-           void $ liftedExecute conn insertQ (aName, aAmount, pass)
+    addNewAsset conn = do
+        checkUserExists conn pass
+        runAtomically conn $ void $ liftedExecute
+                                        conn insertQ (aName, aAmount, pass)
 
     insertQ :: Query
     insertQ = fromString $ concat [ "INSERT INTO account"
@@ -256,6 +258,30 @@ addFunds AddFundsParams{afpPassword = pass, afpAsset = a@Asset{..}} =
 rmFunds :: RmFundsParams -> IO RmFundsRes
 rmFunds RmFundsParams{..} = runExceptT $ rmAssetFromUser rfpPassword rfpAsset
 
+swap :: SwapParams -> IO SwapRes
+swap SwapParams{ spPassword = pass
+               , spPoolID = poolID
+               , spAsset = asset@Asset{aName = swapName, aAmount = swapAmount}
+               } =
+    bracket (connectPostgreSQL connString) close (runExceptT . trans)
+  where
+    trans :: Connection -> Transaction Asset
+    trans conn = do
+        checkUserExists conn pass
+        runAtomically conn $ do pool <- getPoolState conn poolID
+                                rmAssetFromUser pass asset
+                                addLiquidityToPool conn pool swapName swapAmount
+                                payOut <- getPayOut pool
+                                rmLiquidityFromPool
+                                    conn pool (aName payOut) (aAmount payOut)
+                                addAssetToUser pass payOut
+                                return payOut
+      where
+        getPayOut :: Pool -> Transaction Asset
+        getPayOut pool =
+            case B.swap pool asset of
+                Nothing -> except $ Left "Wrong swapping parameters."
+                Just res -> return res
 
 -- | Auxiliary values.
 getPoolState :: Connection -> Integer -> Transaction Pool
@@ -290,16 +316,16 @@ addLiquidityToPool conn
                    Pool{ pLiq = Liq{ lAssetA = Asset{aName = a, aAmount = oldA}
                                    , lAssetB = Asset{aName = b, aAmount = oldB}
                                    }
-                       , pID = pool
+                       , ..
                        }
                    inputName
                    inputAmount
     | inputName == a && oldA + inputAmount >= 0 =
         liftedExecute @(Currency, Integer, Integer)
-                      conn addLiquidityToPoolQ (inputName, inputAmount, pool)
+                      conn addLiquidityToPoolQ (inputName, inputAmount, pID)
     | inputName == a && oldA + inputAmount >= 0 =
         liftedExecute @(Currency, Integer, Integer)
-                      conn addLiquidityToPoolQ (inputName, inputAmount, pool)
+                      conn addLiquidityToPoolQ (inputName, inputAmount, pID)
     | otherwise = except $ Left "Error while udpating liquidity in pool."
   where
     addLiquidityToPoolQ :: Query

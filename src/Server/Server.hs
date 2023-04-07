@@ -38,8 +38,8 @@ type API =
                         :> Post '[JSON] AddFundsRes
     :<|> "rmFunds"      :> ReqBody '[JSON] RmFundsParams
                         :> Post '[JSON] RmFundsRes
-    -- :<|> "swap"         :> ReqBody '[JSON] SwapParams
-    --                     :> Post '[JSON] (Maybe SwapRes)
+    :<|> "swap"         :> ReqBody '[JSON] SwapParams
+                        :> Post '[JSON] SwapRes
 
 server :: Server API
 server =      listPools
@@ -50,7 +50,7 @@ server =      listPools
          :<|> rmLiquidity
          :<|> addFunds
          :<|> rmFunds
-         -- :<|> swap
+         :<|> swap
 
   where
       -- GET requests.
@@ -79,8 +79,8 @@ server =      listPools
     rmFunds :: RmFundsParams -> Handler RmFundsRes
     rmFunds = runOnDB . DB.rmFunds
 
-    -- swap :: SwapParams -> Handler (Maybe SwapRes)
-    -- swap = return . B.swap B.somePool
+    swap :: SwapParams -> Handler SwapRes
+    swap = runOnDB . DB.swap
 
 
 -- | Auxiliary values.
