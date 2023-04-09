@@ -24,22 +24,22 @@ app :: Application
 app = serve (Proxy :: Proxy API) server
 
 type API =
-         "pools"        :> Get '[JSON] [Pool]
-    :<|> "subscribe"    :> Get '[JSON] SubscribeRes
+         "pools"        :> Get '[JSON] (Either String [Pool])
+    :<|> "subscribe"    :> Get '[JSON] (Either String String)
     :<|> "account"      :> ReqBody '[JSON] GetAccountParams
-                        :> Post '[JSON] GetAccountRes
+                        :> Post '[JSON] (Either String Account)
     :<|> "createPool"   :> ReqBody '[JSON] CreatePoolParams
-                        :> Post '[JSON] CreatePoolRes
+                        :> Post '[JSON] (Either String Integer)
     :<|> "addLiquidity" :> ReqBody '[JSON] AddLiqParams
-                        :> Post '[JSON] AddLiqRes
+                        :> Post '[JSON] (Either String Integer)
     :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
-                        :> Post '[JSON] RmLiqRes
+                        :> Post '[JSON] (Either String Liq)
     :<|> "addFunds"     :> ReqBody '[JSON] AddFundsParams
-                        :> Post '[JSON] AddFundsRes
+                        :> Post '[JSON] (Either String ())
     :<|> "rmFunds"      :> ReqBody '[JSON] RmFundsParams
-                        :> Post '[JSON] RmFundsRes
+                        :> Post '[JSON] (Either String ())
     :<|> "swap"         :> ReqBody '[JSON] SwapParams
-                        :> Post '[JSON] SwapRes
+                        :> Post '[JSON] (Either String Asset)
 
 server :: Server API
 server =      listPools
@@ -54,32 +54,35 @@ server =      listPools
 
   where
       -- GET requests.
-    listPools :: Handler [Pool]
+    listPools :: Handler (Either String [Pool])
     listPools = runOnDB DB.pools
 
-    subscribe :: Handler Password
+    subscribe :: Handler (Either String Password)
     subscribe = runOnDB DB.createUser
 
       -- POST requests.
-    accountState :: GetAccountParams -> Handler GetAccountRes
+    accountState :: GetAccountParams -> Handler (Either String Account)
     accountState = runOnDB . DB.getAccount
 
-    createPool :: CreatePoolParams -> Handler CreatePoolRes
+      -- Returns number of new liquidity tokens.
+    createPool :: CreatePoolParams -> Handler (Either String Integer)
     createPool = runOnDB . DB.createPool
 
-    addLiquidity :: AddLiqParams -> Handler AddLiqRes
+      -- Returns number of new liquidity tokens.
+    addLiquidity :: AddLiqParams -> Handler (Either String Integer)
     addLiquidity = runOnDB . DB.addLiquidity
 
-    rmLiquidity :: RmLiqParams -> Handler RmLiqRes
+      -- Returns liquidity removed from pool.
+    rmLiquidity :: RmLiqParams -> Handler (Either String Liq)
     rmLiquidity = runOnDB . DB.rmLiquidity
 
-    addFunds :: AddFundsParams -> Handler AddFundsRes
+    addFunds :: AddFundsParams -> Handler (Either String ())
     addFunds = runOnDB . DB.addFunds
 
-    rmFunds :: RmFundsParams -> Handler RmFundsRes
+    rmFunds :: RmFundsParams -> Handler (Either String ())
     rmFunds = runOnDB . DB.rmFunds
 
-    swap :: SwapParams -> Handler SwapRes
+    swap :: SwapParams -> Handler (Either String Asset)
     swap = runOnDB . DB.swap
 
 
