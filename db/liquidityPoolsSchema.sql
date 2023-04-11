@@ -31,8 +31,8 @@ CREATE TABLE pool (
     asset_name_B currency,
     asset_amount_B integer,
     CHECK (asset_name_A < asset_name_B),
-    CHECK (asset_amount_A > 0),
-    CHECK (asset_amount_B > 0),
+    CHECK (asset_amount_A >= 0),
+    CHECK (asset_amount_B >= 0),
     UNIQUE (asset_name_A, asset_name_B)
 );
 
@@ -45,6 +45,6 @@ CREATE TABLE liquidity_token_ownership (
     pool integer DEFAULT nextval('pool_id') NOT NULL,
     userID text,
     liquidity_token_amount integer,
-    CHECK (liquidity_token_amount > 0),
+    CHECK (liquidity_token_amount >= 0),
     FOREIGN KEY (userID) REFERENCES user_id(key)
 );

@@ -28,41 +28,47 @@ type API =
     :<|> "subscribe"    :> Get '[JSON] SubscribeRes
     :<|> "account"      :> ReqBody '[JSON] GetAccountParams
                         :> Post '[JSON] GetAccountRes
+    :<|> "addFunds"     :> ReqBody '[JSON] AddFundsParams
+                        :> Post '[JSON] AddFundsRes
+    :<|> "rmFunds"      :> ReqBody '[JSON] RmFundsParams
+                        :> Post '[JSON] RmFundsRes
     :<|> "createPool"   :> ReqBody '[JSON] CreatePoolParams
                         :> Post '[JSON] CreatePoolRes
     :<|> "addLiquidity" :> ReqBody '[JSON] AddLiqParams
                         :> Post '[JSON] AddLiqRes
     :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
                         :> Post '[JSON] RmLiqRes
-    :<|> "addFunds"     :> ReqBody '[JSON] AddFundsParams
-                        :> Post '[JSON] AddFundsRes
-    :<|> "rmFunds"      :> ReqBody '[JSON] RmFundsParams
-                        :> Post '[JSON] RmFundsRes
     :<|> "swap"         :> ReqBody '[JSON] SwapParams
                         :> Post '[JSON] SwapRes
 
 server :: Server API
-server =      listPools
+server =      getPools
          :<|> subscribe
-         :<|> accountState
+         :<|> getAccount
+         :<|> addFunds
+         :<|> rmFunds
          :<|> createPool
          :<|> addLiquidity
          :<|> rmLiquidity
-         :<|> addFunds
-         :<|> rmFunds
          :<|> swap
 
   where
-      -- GET requests.
-    listPools :: Handler GetPoolsRes
-    listPools = runOnDB DB.pools
+    getPools :: Handler GetPoolsRes
+    getPools = runOnDB DB.pools
 
     subscribe :: Handler SubscribeRes
-    subscribe = runOnDB DB.createUser
+    subscribe = runOnDB DB.subscribe
 
-      -- POST requests.
-    accountState :: GetAccountParams -> Handler GetAccountRes
-    accountState = runOnDB . DB.getAccount
+    getAccount :: GetAccountParams -> Handler GetAccountRes
+    getAccount = runOnDB . DB.getAccount
+
+      -- Add a single asset to the account.
+    addFunds :: AddFundsParams -> Handler AddFundsRes
+    addFunds = runOnDB . DB.addFunds
+
+      -- Remove a single asset from the account.
+    rmFunds :: RmFundsParams -> Handler RmFundsRes
+    rmFunds = runOnDB . DB.rmFunds
 
       -- Returns number of new liquidity tokens.
     createPool :: CreatePoolParams -> Handler CreatePoolRes
@@ -75,12 +81,6 @@ server =      listPools
       -- Returns liquidity removed from pool.
     rmLiquidity :: RmLiqParams -> Handler RmLiqRes
     rmLiquidity = runOnDB . DB.rmLiquidity
-
-    addFunds :: AddFundsParams -> Handler AddFundsRes
-    addFunds = runOnDB . DB.addFunds
-
-    rmFunds :: RmFundsParams -> Handler RmFundsRes
-    rmFunds = runOnDB . DB.rmFunds
 
     swap :: SwapParams -> Handler SwapRes
     swap = runOnDB . DB.swap

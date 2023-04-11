@@ -54,19 +54,16 @@ pools = runTransaction trans
                                   , "ON liquidity_token.pool = pool.key"
                                   ]
 
-createUser :: IO SubscribeRes
-createUser = runTransaction trans
+subscribe :: IO SubscribeRes
+subscribe = runTransaction trans
   where
     trans :: Connection -> Transaction Password
-    trans conn = do id <- liftIO $ B.createUserID
-                    insert id conn
+    trans conn = do newID <- liftIO $ B.createUserID
+                    liftedExecute @(Only String) conn insertQ (Only newID)
+                    return newID
 
-    insert :: String -> Connection -> Transaction Password
-    insert id conn = do liftedExecute_ conn (insertQ id)
-                        return id
-
-    insertQ :: Password -> Query
-    insertQ id = fromString $ "INSERT INTO user_id VALUES ('" ++ id ++ "')"
+    insertQ :: Query
+    insertQ = fromString "INSERT INTO user_id VALUES (?)"
 
 getAccount :: GetAccountParams -> IO GetAccountRes
 getAccount GetAccountParams{gapID=pass} = runTransaction trans
@@ -81,7 +78,15 @@ getAccount GetAccountParams{gapID=pass} = runTransaction trans
             Just res -> return res
       where
         accountQ :: Query
-        accountQ = "SELECT * FROM account WHERE userID=?"
+        accountQ = "SELECT * FROM account WHERE userID = ?"
+
+addFunds :: AddFundsParams -> IO AddFundsRes
+addFunds AddFundsParams{afpPassword = pass, afpAsset = a@Asset{..}} =
+    runTransaction $ addAssetToUser pass a
+
+rmFunds :: RmFundsParams -> IO RmFundsRes
+rmFunds RmFundsParams{..} = runTransaction $ rmAssetFromUser rfpPassword
+                                                             rfpAsset
 
 createPool :: CreatePoolParams -> IO CreatePoolRes
 createPool cpp@CreatePoolParams{ cppLiq =
@@ -107,14 +112,22 @@ createPool cpp@CreatePoolParams{ cppLiq =
                     addLiquidityTrans (createPoolParamsToAddLiq cpp) conn
       where
         insertPool :: Transaction ()
-        insertPool = void $ liftedExecute conn insertPoolQ (newAName, newBName)
-          where
-            insertPoolQ :: Query
-            insertPoolQ = fromString $ concat ["INSERT INTO pool "
-                                              ,"(asset_name_A, asset_amount_A, "
-                                              , "asset_name_B, asset_amount_B) "
-                                              ,"VALUES (?, 0, ?, 0)"
-                                              ]
+        insertPool = do liftedExecute conn insertPoolQ (newAName, newBName)
+                        newPoolID <- findPoolID newAName newBName conn
+                        void $ liftedExecute @(Integer, Integer)
+                                             conn insertTokensQ (newPoolID, 0)
+
+        insertPoolQ :: Query
+        insertPoolQ = fromString $ concat ["INSERT INTO pool "
+                                          ,"(asset_name_A, asset_amount_A, "
+                                          , "asset_name_B, asset_amount_B) "
+                                          ,"VALUES (?, 0, ?, 0)"
+                                          ]
+        insertTokensQ :: Query
+        insertTokensQ =
+          fromString $ concat [ "INSERT INTO liquidity_token (pool, amount)"
+                              , "VALUES (?, ?)"
+                              ]
 
 addLiquidity :: AddLiqParams -> IO AddLiqRes
 addLiquidity = runTransaction . addLiquidityTrans
@@ -143,43 +156,27 @@ addLiquidityTrans
         pool@Pool{..} <- getPoolState conn pID
         rmAssetFromUser pass a conn
         rmAssetFromUser pass b conn
-        newTokens <- addLiqToPool pool
+        newTokens <- addLiqAndGetNewTokens pool
         addTokensToUser conn pass pID newTokens
         addTokensToPool conn pID newTokens
         return newTokens
       where
-        findPoolID :: Currency -> Currency -> Connection -> Transaction Integer
-        findPoolID aCurrency bCurrency conn = do
-            pools <- liftIO (query @(Currency, Currency) @(Only Integer)
-                                   conn findPoolIDQ (aCurrency, bCurrency))
-            case pools of
-              [Only pID] -> return pID
-              _          -> except $ Left "Error retrieving pool identifier"
-          where
-            findPoolIDQ :: Query
-            findPoolIDQ = fromString $ concat [ "SELECT key FROM pool "
-                                              , "WHERE asset_name_A = ? "
-                                              , "AND asset_name_B = ?"
-                                              ]
-
-        addLiqToPool :: Pool -> Transaction Integer
-        addLiqToPool pool@Pool{..} = do
+        addLiqAndGetNewTokens :: Pool -> Transaction Integer
+        addLiqAndGetNewTokens pool@Pool{..} = do
             addARes <- addLiquidityToPool conn pool newAName newA
             addBRes <- addLiquidityToPool conn pool newBName newB
             if addARes == 0 || addBRes == 0
             then except $ Left "Could not add liquidity to the pool."
-            else getNumberNewTokens pool
+            else getPoolState conn pID >>= getNumberNewTokens
 
         getNumberNewTokens :: Pool -> Transaction Integer
-        getNumberNewTokens Pool{..} =
-            case B.newTokens oldLiq newLiq pLiqTokens of
-                Nothing -> except $ Left "Error computing number of new tokens."
-                Just res -> return res
-          where
-            oldLiq :: Liq
-            oldLiq = mkLiq
-                       (mkAsset (aName $ lAssetA pLiq) (aAmount $ lAssetA pLiq))
-                       (mkAsset (aName $ lAssetB pLiq) (aAmount $ lAssetB pLiq))
+        getNumberNewTokens p@Pool{..}
+            | pLiqTokens == 0 = return $ B.initialTokens newA newB
+            | otherwise =
+                case B.newTokens pLiq newLiq pLiqTokens of
+                    Nothing -> except $ Left
+                                         "Error computing number of new tokens."
+                    Just res -> return res
 
 rmLiquidity :: RmLiqParams -> IO RmLiqRes
 rmLiquidity rlp@RmLiqParams{ rlpPass = pass
@@ -225,14 +222,6 @@ rmLiquidity rlp@RmLiqParams{ rlpPass = pass
             liq :: Liq
             liq = B.rmLiq p pLiqTokens
 
-addFunds :: AddFundsParams -> IO AddFundsRes
-addFunds AddFundsParams{afpPassword = pass, afpAsset = a@Asset{..}} =
-    runTransaction $ addAssetToUser pass a
-
-rmFunds :: RmFundsParams -> IO RmFundsRes
-rmFunds RmFundsParams{..} =
-    runTransaction $ rmAssetFromUser rfpPassword rfpAsset
-
 swap :: SwapParams -> IO SwapRes
 swap SwapParams{ spPassword = pass
                , spPoolID = poolID
@@ -267,13 +256,29 @@ checkUserExists :: Connection -> Password -> Transaction ()
 checkUserExists conn pass =
     do user <- liftedQuery @(Only Password) @(Only String)
                            conn findUserQ (Only pass)
-       if not (null user) then return () else except $ Left "User not found."
+       if not (null user)
+       then return ()
+       else except $ Left "User not found."
   where
     findUserQ :: Query
     findUserQ = fromString $ concat [ "SELECT * "
                                     , "FROM user_id "
                                     , "WHERE key = ?"
                                     ]
+
+findPoolID :: Currency -> Currency -> Connection -> Transaction Integer
+findPoolID aCurrency bCurrency conn = do
+    pools <- liftIO (query @(Currency, Currency) @(Only Integer)
+                           conn findPoolIDQ (aCurrency, bCurrency))
+    case pools of
+      [Only pID] -> return pID
+      _          -> except $ Left "Error retrieving pool identifier"
+  where
+    findPoolIDQ :: Query
+    findPoolIDQ = fromString $ concat [ "SELECT key FROM pool "
+                                      , "WHERE asset_name_A = ? "
+                                      , "AND asset_name_B = ?"
+                                      ]
 
 getPoolState :: Connection -> Integer -> Transaction Pool
 getPoolState conn poolID = do
@@ -286,15 +291,15 @@ getPoolState conn poolID = do
                           (mkLiq (mkAsset aName oldA)
                                  (mkAsset bName oldB))
                           oldTokens
-        _ -> except $ Left "Error retrieving previous liquidity."
+        [] -> except $ Left "Pool not found."
+        _ -> except $ Left $ "Error retrieving previous liquidity." ++ show res
   where
     getNumberNewTokensQ :: Query
     getNumberNewTokensQ =
         fromString $ concat
             [ "SELECT asset_name_A, asset_amount_A, "
-            ,        "asset_name_B, asset_amount_B, amount"
-            , "FROM pool"
-            , "INNER JOIN liquidity_token ON key = pool "
+            ,        "asset_name_B, asset_amount_B, 0 "
+            , "FROM pool "
             , "WHERE key = ?"
             ]
 
@@ -311,19 +316,29 @@ addLiquidityToPool conn
                        }
                    inputName
                    inputAmount
-    | inputName == a && oldA + inputAmount >= 0 =
-        liftedExecute @(Currency, Integer, Integer)
-                      conn addLiquidityToPoolQ (inputName, inputAmount, pID)
-    | inputName == a && oldA + inputAmount >= 0 =
-        liftedExecute @(Currency, Integer, Integer)
-                      conn addLiquidityToPoolQ (inputName, inputAmount, pID)
-    | otherwise = except $ Left "Error while udpating liquidity in pool."
+    | wrongParams = except $ Left "Error while udpating liquidity in pool."
+    | otherwise = do
+        rows <- liftedExecute @(Integer, Integer)
+                              conn addLiquidityToPoolQ (inputAmount, pID)
+        if rows == 1
+        then return rows
+        else except $ Left "Could not add liquidity."
   where
+    wrongParams :: Bool
+    wrongParams = not $    (inputName == a && oldA + inputAmount >= 0)
+                        || (inputName == b && oldB + inputAmount >= 0)
+
     addLiquidityToPoolQ :: Query
-    addLiquidityToPoolQ = fromString $ concat [ "UPDATE liquidity_token "
-                                              , "SET amount = amount + ? "
-                                              , "WHERE pool = ?"
-                                              ]
+    addLiquidityToPoolQ =
+      if inputName == a
+      then fromString $ concat [ "UPDATE pool "
+                               , "SET asset_amount_A = asset_amount_A + ? "
+                               , "WHERE key = ?"
+                               ]
+      else fromString $ concat [ "UPDATE pool "
+                               , "SET asset_amount_B = asset_amount_B + ? "
+                               , "WHERE key = ?"
+                               ]
 
 rmLiquidityFromPool :: Connection
                     -> Pool
@@ -333,26 +348,26 @@ rmLiquidityFromPool :: Connection
 rmLiquidityFromPool c p n = addLiquidityToPool c p n . negate
 
 addAssetToUser :: Password -> Asset -> Connection -> Transaction ()
-addAssetToUser pass Asset{..} conn = findAsset >>= updateAsset
+addAssetToUser pass Asset{..} conn = findAssetEntry >>= updateAsset
   where
-    findAsset :: Transaction Integer
-    findAsset = do
+    findAssetEntry :: Transaction (Maybe Integer)
+    findAssetEntry = do
         assets <- liftedQuery @(Currency, Password) @(Only Integer)
-                              conn findAssetQ (aName, pass)
+                              conn findAssetEntryQ (aName, pass)
         case assets of
-            []           -> except $ Left "No assets to remove."
-            [Only asset] -> return asset
+            []           -> return $ Nothing
+            [Only asset] -> return $ Just asset
             manyAssets   -> except $ Left "Ill-formed account, fix manually"
 
-    findAssetQ :: Query
-    findAssetQ =
+    findAssetEntryQ :: Query
+    findAssetEntryQ =
         fromString $ concat [ "SELECT asset_amount "
                             , "FROM account "
                             , "WHERE asset_name = ? AND userID = ?"
                             ]
 
-    updateAsset :: Integer -> Transaction ()
-    updateAsset totalAmount
+    updateAsset :: Maybe Integer -> Transaction ()
+    updateAsset (Just totalAmount)
       | totalAmount + aAmount < 0 =
           except $ Left $ concat [ "Insufficient funds, cannot remove "
                                  , show (abs aAmount)
@@ -362,12 +377,22 @@ addAssetToUser pass Asset{..} conn = findAsset >>= updateAsset
       | otherwise =
           void $ liftedExecute @(Integer, Currency, String)
                                conn updateAQ (aAmount, aName, pass)
+    updateAsset Nothing =
+          void $ liftedExecute @(Currency, Integer, String)
+                               conn insertAQ (aName, aAmount, pass)
 
     updateAQ :: Query
     updateAQ = fromString $ concat [ "UPDATE account "
                                    , "SET asset_amount = asset_amount + ? "
                                    , "WHERE asset_name = ? AND userID = ?"
                                    ]
+
+    insertAQ :: Query
+    insertAQ = fromString $ concat [ "INSERT INTO account "
+                                   , "(asset_name, asset_amount, userID) "
+                                   , "VALUES (?, ?, ?)"
+                                   ]
+
 
 rmAssetFromUser :: Password -> Asset -> Connection -> Transaction ()
 rmAssetFromUser pass a@Asset{aAmount = amount} conn =
@@ -407,7 +432,7 @@ addTokensToPool conn poolID tokens = do
 
     inductiveQ :: Query
     inductiveQ = fromString $ concat [ "UPDATE liquidity_token "
-                                     , "SET amount = amount - ? "
+                                     , "SET amount = amount + ? "
                                      , "WHERE pool = ?"
                                      ]
 
@@ -449,28 +474,61 @@ addTokensToUser :: Connection
                 -> Password
                 -> Integer
                 -> Integer
-                -> Transaction Integer
-addTokensToUser conn pass poolID tokens = do
-    updRows <- liftedExecute @(Integer, Integer, Password)
-                             conn addTokensToUserQ (tokens, poolID, pass)
-    if updRows == 1
-    then return tokens
-    else except $ Left "Could not update liquidity tokens for user."
+                -> Transaction ()
+addTokensToUser conn pass poolID tokens = ifM tokensExist update insert
   where
-    addTokensToUserQ :: Query
-    addTokensToUserQ =
+    tokensExist :: Transaction Bool
+    tokensExist = do
+      rows <- liftedQuery @(Integer, Password) @(Only Integer)
+                          conn tokensExistQ (poolID, pass)
+      case rows of
+        [Only _] -> return True
+        _          -> return False
+
+    tokensExistQ :: Query
+    tokensExistQ = fromString $ concat [ "SELECT pool "
+                                       , "FROM liquidity_token_ownership "
+                                       , "WHERE pool = ? AND userID = ?"
+                                       ]
+
+    update :: Transaction ()
+    update = do
+        rows <- liftedExecute @(Integer, Integer, Password)
+                               conn updateUserTokensQ (tokens, poolID, pass)
+        if rows == 1
+        then return ()
+        else except $ Left $ "Could not update liquidity tokens for user." ++ show (tokens, poolID, pass)
+
+    insert :: Transaction ()
+    insert = do
+        rows <- liftedExecute @(Integer, Password, Integer)
+                              conn insertUserTokensQ (poolID, pass, tokens)
+        if rows == 1
+        then return ()
+        else except $ Left "Could not insert liquidity tokens for user."
+
+
+    updateUserTokensQ :: Query
+    updateUserTokensQ =
         fromString $ concat
             [ "UPDATE liquidity_token_ownership "
             , "SET liquidity_token_amount = liquidity_token_amount + ? "
             , "WHERE pool = ? AND userID = ?"
             ]
 
+    insertUserTokensQ :: Query
+    insertUserTokensQ =
+        fromString $ concat [ "INSERT INTO liquidity_token_ownership "
+                            , "(pool, userID, liquidity_token_amount) "
+                            , "VALUES (?, ?, ?)"
+                            ]
+
 rmTokensFromUser :: Connection
                  -> Password
                  -> Integer
                  -> Integer
-                 -> Transaction Integer
-rmTokensFromUser pass p conn tokens = addTokensToUser pass p conn (-tokens)
+                 -> Transaction ()
+rmTokensFromUser conn pass pID tokens = addTokensToUser conn pass pID (-tokens)
 
 liftedExecute :: ToRow q => Connection -> Query -> q -> Transaction Int64
 liftedExecute conn q = liftIO . execute conn q
