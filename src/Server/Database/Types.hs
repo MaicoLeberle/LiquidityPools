@@ -6,22 +6,33 @@
 module Database.Types
     ( PoolRow
     , AccountRow
+        -- Retrieve list of pools.
+    , GetPoolsRes
         -- Create pool.
     , CreatePoolParams(..)
-        -- Retrieve account state.
+    , CreatePoolRes
+        -- Create new user and retrieve password.
+    , SubscribeRes
+        -- Get account state.
     , GetAccountParams(..)
+    , GetAccountRes
         -- Add funds to an account.
     , AddFundsParams(..)
+    , AddFundsRes
         -- Remove funds from an account.
     , RmFundsParams(..)
+    , RmFundsRes
         -- Add liquidity from an account to a pool.
     , AddLiqParams(..)
+    , AddLiqRes
     , createPoolParamsToAddLiq
     , Transaction
         -- Remove liquidity from a pool to an account.
     , RmLiqParams(..)
+    , RmLiqRes
         -- Swap liquidity at a pool.
     , SwapParams(..)
+    , SwapRes
     ) where
 
 import Control.Monad.Trans.Except
@@ -53,9 +64,13 @@ type AccountRow = ( Currency -- Asset name
 -}
 type Transaction a = ExceptT String IO a
 
--- | account endpoint.
+-- | account endpoint types.
+type GetPoolsRes = Either String [Pool]
+
 newtype GetAccountParams = GetAccountParams { gapID :: String }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+type GetAccountRes = Either String Account
 
 -- | createPool endpoint.
 data CreatePoolParams = CreatePoolParams
@@ -64,12 +79,18 @@ data CreatePoolParams = CreatePoolParams
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
+type CreatePoolRes = Either String Integer
+
+type SubscribeRes = Either String Password
+
 -- | addFunds endpoint.
 data AddFundsParams = AddFundsParams
     { afpPassword :: Password
     , afpAsset :: Asset
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+type AddFundsRes = Either String ()
 
 -- | rmFunds endpoint.
 data RmFundsParams = RmFundsParams
@@ -78,12 +99,16 @@ data RmFundsParams = RmFundsParams
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
+type RmFundsRes = Either String ()
+
 -- | addLiquidity endpoint.
 data AddLiqParams = AddLiqParams
     { alpPassword :: Password
     , alpLiq      :: Liq
     }
   deriving (Eq, Show, Generic, FromJSON)
+
+type AddLiqRes = Either String Integer
 
 -- | Note that CreatePoolParams are isomorphic to AddLiqParams
 createPoolParamsToAddLiq :: CreatePoolParams -> AddLiqParams
@@ -99,6 +124,8 @@ data RmLiqParams = RmLiqParams
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
+type RmLiqRes = Either String Liq
+
 -- | swap endpoint.
 data SwapParams = SwapParams
     { spPassword :: Password
@@ -106,3 +133,5 @@ data SwapParams = SwapParams
     , spPoolID   :: Integer
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+type SwapRes = Either String Asset

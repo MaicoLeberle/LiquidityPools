@@ -15,7 +15,6 @@ module Types
     , Account(..)
     , mkAccount
     , Password
-    , SubscribeRes(..)
     ) where
 
 import Data.Aeson
@@ -67,5 +66,3 @@ mkAccount :: Password -> [Asset] -> Account
 mkAccount = Account
 
 type Password = String
-
-type SubscribeRes = String

@@ -33,23 +33,11 @@ import qualified Business          as B ( createUserID
 import           Database.Business      ( fromPoolRow
                                         , fromAccountRows
                                         )
-import           Database.Types         ( PoolRow(..)
-                                        , AccountRow(..)
-                                        , Transaction(..)
-                                        , CreatePoolParams(..)
-                                        , GetAccountParams(..)
-                                        , AddFundsParams(..)
-                                        , RmFundsParams(..)
-                                        , AddLiqParams(..)
-                                        , createPoolParamsToAddLiq
-                                        , Transaction
-                                        , RmLiqParams(..)
-                                        , SwapParams(..)
-                                        )
+import           Database.Types
 import           Types
 
 
-pools :: IO (Either String [Pool])
+pools :: IO GetPoolsRes
 pools = runTransaction trans
   where
     trans :: Connection -> Transaction [Pool]
@@ -66,7 +54,7 @@ pools = runTransaction trans
                                   , "ON liquidity_token.pool = pool.key"
                                   ]
 
-createUser :: IO (Either String Password)
+createUser :: IO SubscribeRes
 createUser = runTransaction trans
   where
     trans :: Connection -> Transaction Password
@@ -80,7 +68,7 @@ createUser = runTransaction trans
     insertQ :: Password -> Query
     insertQ id = fromString $ "INSERT INTO user_id VALUES ('" ++ id ++ "')"
 
-getAccount :: GetAccountParams -> IO (Either String Account)
+getAccount :: GetAccountParams -> IO GetAccountRes
 getAccount GetAccountParams{gapID=pass} = runTransaction trans
   where
     trans :: Connection -> Transaction Account
@@ -95,7 +83,7 @@ getAccount GetAccountParams{gapID=pass} = runTransaction trans
         accountQ :: Query
         accountQ = "SELECT * FROM account WHERE userID=?"
 
-createPool :: CreatePoolParams -> IO (Either String Integer)
+createPool :: CreatePoolParams -> IO CreatePoolRes
 createPool cpp@CreatePoolParams{ cppLiq =
                                     newLiq@Liq
                                       { lAssetA = a@Asset{ aName = newAName
@@ -116,7 +104,7 @@ createPool cpp@CreatePoolParams{ cppLiq =
     trans :: Connection -> Transaction Integer
     trans conn = do checkUserExists conn cppPassword
                     insertPool
-                    addLiquidity' (createPoolParamsToAddLiq cpp) conn
+                    addLiquidityTrans (createPoolParamsToAddLiq cpp) conn
       where
         insertPool :: Transaction ()
         insertPool = void $ liftedExecute conn insertPoolQ (newAName, newBName)
@@ -128,11 +116,11 @@ createPool cpp@CreatePoolParams{ cppLiq =
                                               ,"VALUES (?, 0, ?, 0)"
                                               ]
 
-addLiquidity :: AddLiqParams -> IO (Either String Integer)
-addLiquidity = runTransaction . addLiquidity'
+addLiquidity :: AddLiqParams -> IO AddLiqRes
+addLiquidity = runTransaction . addLiquidityTrans
 
-addLiquidity' :: AddLiqParams -> Connection -> Transaction Integer
-addLiquidity'
+addLiquidityTrans :: AddLiqParams -> Connection -> Transaction Integer
+addLiquidityTrans
     AddLiqParams { alpPassword = pass
                  , alpLiq = newLiq@Liq{ lAssetA = a@Asset{ aName = newAName
                                                          , aAmount = newA
@@ -193,7 +181,7 @@ addLiquidity'
                        (mkAsset (aName $ lAssetA pLiq) (aAmount $ lAssetA pLiq))
                        (mkAsset (aName $ lAssetB pLiq) (aAmount $ lAssetB pLiq))
 
-rmLiquidity :: RmLiqParams -> IO (Either String Liq)
+rmLiquidity :: RmLiqParams -> IO RmLiqRes
 rmLiquidity rlp@RmLiqParams{ rlpPass = pass
                            , rlpPoolID = poolID
                            , rlpTokens = tokens
@@ -237,15 +225,15 @@ rmLiquidity rlp@RmLiqParams{ rlpPass = pass
             liq :: Liq
             liq = B.rmLiq p pLiqTokens
 
-addFunds :: AddFundsParams -> IO (Either String ())
+addFunds :: AddFundsParams -> IO AddFundsRes
 addFunds AddFundsParams{afpPassword = pass, afpAsset = a@Asset{..}} =
     runTransaction $ addAssetToUser pass a
 
-rmFunds :: RmFundsParams -> IO (Either String ())
+rmFunds :: RmFundsParams -> IO RmFundsRes
 rmFunds RmFundsParams{..} =
     runTransaction $ rmAssetFromUser rfpPassword rfpAsset
 
-swap :: SwapParams -> IO (Either String Asset)
+swap :: SwapParams -> IO SwapRes
 swap SwapParams{ spPassword = pass
                , spPoolID = poolID
                , spAsset = asset@Asset{aName = swapName, aAmount = swapAmount}
