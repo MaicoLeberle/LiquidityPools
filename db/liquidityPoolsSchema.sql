@@ -37,12 +37,12 @@ CREATE TABLE pool (
 );
 
 CREATE TABLE liquidity_token (
-    pool integer DEFAULT nextval('pool_id') NOT NULL,
+    poolID integer DEFAULT nextval('pool_id') NOT NULL,
     amount integer
 );
 
 CREATE TABLE liquidity_token_ownership (
-    pool integer DEFAULT nextval('pool_id') NOT NULL,
+    poolID integer DEFAULT nextval('pool_id') NOT NULL,
     userID text,
     liquidity_token_amount integer,
     CHECK (liquidity_token_amount >= 0),

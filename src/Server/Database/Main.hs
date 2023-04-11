@@ -51,7 +51,7 @@ pools = runTransaction trans
                                   ,        "pool.asset_amount_b, "
                                   ,        "liquidity_token.amount "
                                   , "FROM pool INNER JOIN liquidity_token "
-                                  , "ON liquidity_token.pool = pool.key"
+                                  , "ON liquidity_token.poolID = pool.key"
                                   ]
 
 subscribe :: IO SubscribeRes
@@ -125,7 +125,7 @@ createPool cpp@CreatePoolParams{ cppLiq =
                                           ]
         insertTokensQ :: Query
         insertTokensQ =
-          fromString $ concat [ "INSERT INTO liquidity_token (pool, amount)"
+          fromString $ concat [ "INSERT INTO liquidity_token (poolID, amount)"
                               , "VALUES (?, ?)"
                               ]
 
@@ -163,8 +163,8 @@ addLiquidityTrans
       where
         addLiqAndGetNewTokens :: Pool -> Transaction Integer
         addLiqAndGetNewTokens pool@Pool{..} = do
-            addARes <- addLiquidityToPool conn pool newAName newA
-            addBRes <- addLiquidityToPool conn pool newBName newB
+            addARes <- addLiquidityToPool conn pool a
+            addBRes <- addLiquidityToPool conn pool b
             if addARes == 0 || addBRes == 0
             then except $ Left "Could not add liquidity to the pool."
             else getPoolState conn pID >>= getNumberNewTokens
@@ -179,25 +179,22 @@ addLiquidityTrans
                     Just res -> return res
 
 rmLiquidity :: RmLiqParams -> IO RmLiqRes
-rmLiquidity rlp@RmLiqParams{ rlpPass = pass
-                           , rlpPoolID = poolID
-                           , rlpTokens = tokens
-                           }
+rmLiquidity rlp@RmLiqParams{..}
     | wrongParams = return $ Left "Cannot destroy negative number of tokens."
     | otherwise = runTransaction trans
   where
     wrongParams :: Bool
-    wrongParams = tokens <= 0
+    wrongParams = rlpTokens <= 0
 
     trans :: Connection -> Transaction Liq
     trans conn = do
-        checkUserExists conn pass
-        pool <- getPoolState conn poolID
-        rmTokensFromPool poolID conn tokens
-        rmTokensFromUser conn pass poolID tokens
+        checkUserExists conn rlpPass
+        pool <- getPoolState conn rlpPoolID
         liq <- rmLiqFromPool pool
-        addAssetToUser pass (lAssetA liq) conn
-        addAssetToUser pass (lAssetB liq) conn
+        rmTokensFromPool rlpPoolID conn rlpTokens
+        rmTokensFromUser conn rlpPass rlpPoolID rlpTokens
+        addAssetToUser rlpPass (lAssetA liq) conn
+        addAssetToUser rlpPass (lAssetB liq) conn
         return liq
       where
         mkRmLiq :: Pool -> Integer -> Integer -> (Asset, Asset)
@@ -207,8 +204,10 @@ rmLiquidity rlp@RmLiqParams{ rlpPass = pass
 
         rmLiqFromPool :: Pool -> Transaction Liq
         rmLiqFromPool p@Pool{..} =
-            do rmARes <- rmLiquidityFromPool conn p (aName $ lAssetA pLiq) rmA
-               rmBRes <- rmLiquidityFromPool conn p (aName $ lAssetB pLiq) rmB
+            do rmARes <- rmLiquidityFromPool
+                            conn p (mkAsset (aName $ lAssetA pLiq) rmA)
+               rmBRes <- rmLiquidityFromPool
+                            conn p (mkAsset (aName $ lAssetB pLiq) rmB)
                if rmA == 0 || rmB == 0
                then except $ Left "Error while removing liquidity from pool."
                else return liq
@@ -223,31 +222,27 @@ rmLiquidity rlp@RmLiqParams{ rlpPass = pass
             liq = B.rmLiq p pLiqTokens
 
 swap :: SwapParams -> IO SwapRes
-swap SwapParams{ spPassword = pass
-               , spPoolID = poolID
-               , spAsset = asset@Asset{aName = swapName, aAmount = swapAmount}
-               }
-    | wrongParams =
-        return $ Left $ "Cannot swap non-positive number of " ++ show swapName
+swap SwapParams{..}
+    | wrongParams = return $ Left $ "Cannot swap " ++ show (aName spAsset)
     | otherwise = runTransaction trans
   where
     wrongParams :: Bool
-    wrongParams = swapAmount <= 0
+    wrongParams = aAmount spAsset <= 0
 
     trans :: Connection -> Transaction Asset
     trans conn = do
-        checkUserExists conn pass
-        pool <- getPoolState conn poolID
-        rmAssetFromUser pass asset conn
-        addLiquidityToPool conn pool swapName swapAmount
+        checkUserExists conn spPassword
+        pool <- getPoolState conn spPoolID
+        rmAssetFromUser spPassword spAsset conn
+        addLiquidityToPool conn pool spAsset
         payOut <- getPayOut pool
-        rmLiquidityFromPool conn pool (aName payOut) (aAmount payOut)
-        addAssetToUser pass payOut conn
+        rmLiquidityFromPool conn pool payOut
+        addAssetToUser spPassword payOut conn
         return payOut
       where
         getPayOut :: Pool -> Transaction Asset
         getPayOut pool =
-            case B.swap pool asset of
+            case B.swap pool spAsset of
                 Nothing -> except $ Left "Wrong swapping parameters."
                 Just res -> return res
 
@@ -282,31 +277,35 @@ findPoolID aCurrency bCurrency conn = do
 
 getPoolState :: Connection -> Integer -> Transaction Pool
 getPoolState conn poolID = do
-    res <- liftedQuery @(Only Integer)
-                       @(Currency, Integer, Currency, Integer, Integer)
-                       conn getNumberNewTokensQ (Only poolID)
-    case res of
+    resPool <- liftedQuery @(Only Integer)
+                           @(Currency, Integer, Currency, Integer, Integer)
+                           conn getPoolLiqQ (Only poolID)
+    resTokens <- liftedQuery @(Only Integer) @(Only Integer)
+                             conn getTokensQ (Only poolID)
+    case resPool of
         [(aName, oldA, bName, oldB, oldTokens)] ->
-          return $ mkPool poolID
-                          (mkLiq (mkAsset aName oldA)
-                                 (mkAsset bName oldB))
-                          oldTokens
-        [] -> except $ Left "Pool not found."
-        _ -> except $ Left $ "Error retrieving previous liquidity." ++ show res
+            return $ mkPool poolID
+                            (mkLiq (mkAsset aName oldA) (mkAsset bName oldB))
+                            oldTokens
+        _ -> except $ Left "Pool not found."
+        -- _ -> except $ Left $ "Error retrieving previous liquidity." ++ show (resPool, resTokens)
   where
-    getNumberNewTokensQ :: Query
-    getNumberNewTokensQ =
-        fromString $ concat
-            [ "SELECT asset_name_A, asset_amount_A, "
-            ,        "asset_name_B, asset_amount_B, 0 "
-            , "FROM pool "
-            , "WHERE key = ?"
-            ]
+    getPoolLiqQ :: Query
+    getPoolLiqQ = fromString $ concat [ "SELECT asset_name_A, asset_amount_A, "
+                                      , "asset_name_B, asset_amount_B, amount "
+                                      , "FROM pool JOIN liquidity_token ON poolID = key "
+                                      , "WHERE key = ?"
+                                      ]
+
+    getTokensQ :: Query
+    getTokensQ = fromString $ concat [ "SELECT amount "
+                                     , "FROM liquidity_token "
+                                     , "WHERE poolID = ?"
+                                     ]
 
 addLiquidityToPool :: Connection
                    -> Pool
-                   -> Currency
-                   -> Integer
+                   -> Asset
                    -> Transaction Int64
 addLiquidityToPool conn
                    Pool{ pLiq = Liq{ lAssetA = Asset{aName = a, aAmount = oldA}
@@ -314,8 +313,7 @@ addLiquidityToPool conn
                                    }
                        , ..
                        }
-                   inputName
-                   inputAmount
+                   Asset{ aName = inputName, aAmount = inputAmount }
     | wrongParams = except $ Left "Error while udpating liquidity in pool."
     | otherwise = do
         rows <- liftedExecute @(Integer, Integer)
@@ -342,10 +340,9 @@ addLiquidityToPool conn
 
 rmLiquidityFromPool :: Connection
                     -> Pool
-                    -> Currency
-                    -> Integer
+                    -> Asset
                     -> Transaction Int64
-rmLiquidityFromPool c p n = addLiquidityToPool c p n . negate
+rmLiquidityFromPool c pID a = addLiquidityToPool c pID a{aAmount = -(aAmount a)}
 
 addAssetToUser :: Password -> Asset -> Connection -> Transaction ()
 addAssetToUser pass Asset{..} conn = findAssetEntry >>= updateAsset
@@ -419,21 +416,21 @@ addTokensToPool conn poolID tokens = do
             _   -> except $ Left "Database corrupted."
 
     poolExistsQ :: Query
-    poolExistsQ = fromString $ concat [ "SELECT pool "
+    poolExistsQ = fromString $ concat [ "SELECT poolID "
                                       , "FROM liquidity_token "
-                                      , "WHERE pool = ?"
+                                      , "WHERE poolID = ?"
                                       ]
 
     initialQ :: Query
     initialQ =
-        fromString $ concat [ "INSERT INTO liquidity_token (amount, pool) "
+        fromString $ concat [ "INSERT INTO liquidity_token (amount, poolID) "
                             , "VALUES (?, ?)"
                             ]
 
     inductiveQ :: Query
     inductiveQ = fromString $ concat [ "UPDATE liquidity_token "
                                      , "SET amount = amount + ? "
-                                     , "WHERE pool = ?"
+                                     , "WHERE poolID = ?"
                                      ]
 
 rmTokensFromPool :: Integer
@@ -459,15 +456,15 @@ rmTokensFromPool poolID conn tokens = do
             _   -> except $ Left "Database corrupted."
 
     poolExistsQ :: Query
-    poolExistsQ = fromString $ concat [ "SELECT pool "
+    poolExistsQ = fromString $ concat [ "SELECT poolID "
                                       , "FROM liquidity_token "
-                                      , "WHERE pool = ?"
+                                      , "WHERE poolID = ?"
                                       ]
 
     rmTokensFromPoolQ :: Query
     rmTokensFromPoolQ = fromString $ concat [ "UPDATE liquidity_token "
                                             , "SET amount = amount - ? "
-                                            , "WHERE pool = ?"
+                                            , "WHERE poolID = ?"
                                             ]
 
 addTokensToUser :: Connection
@@ -486,9 +483,9 @@ addTokensToUser conn pass poolID tokens = ifM tokensExist update insert
         _          -> return False
 
     tokensExistQ :: Query
-    tokensExistQ = fromString $ concat [ "SELECT pool "
+    tokensExistQ = fromString $ concat [ "SELECT poolID "
                                        , "FROM liquidity_token_ownership "
-                                       , "WHERE pool = ? AND userID = ?"
+                                       , "WHERE poolID = ? AND userID = ?"
                                        ]
 
     update :: Transaction ()
@@ -513,13 +510,13 @@ addTokensToUser conn pass poolID tokens = ifM tokensExist update insert
         fromString $ concat
             [ "UPDATE liquidity_token_ownership "
             , "SET liquidity_token_amount = liquidity_token_amount + ? "
-            , "WHERE pool = ? AND userID = ?"
+            , "WHERE poolID = ? AND userID = ?"
             ]
 
     insertUserTokensQ :: Query
     insertUserTokensQ =
         fromString $ concat [ "INSERT INTO liquidity_token_ownership "
-                            , "(pool, userID, liquidity_token_amount) "
+                            , "(poolID, userID, liquidity_token_amount) "
                             , "VALUES (?, ?, ?)"
                             ]
 
