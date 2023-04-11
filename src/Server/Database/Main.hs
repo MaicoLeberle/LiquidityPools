@@ -314,7 +314,7 @@ addLiquidityToPool conn
                        , ..
                        }
                    Asset{ aName = inputName, aAmount = inputAmount }
-    | wrongParams = except $ Left "Error while udpating liquidity in pool."
+    | wrongParams = except $ Left "Error while updating liquidity in pool."
     | otherwise = do
         rows <- liftedExecute @(Integer, Integer)
                               conn addLiquidityToPoolQ (inputAmount, pID)

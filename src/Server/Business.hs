@@ -91,14 +91,14 @@ swap p@Pool{..} Asset{aName = swapName, aAmount = swapAmount}
   | swapAForB =
     let (payOut, payOutName) =
           ( ceiling $ (fromIntegral $ (aAmount assetA) * (aAmount assetB))
-                              / (fromIntegral swapAmount)
+                              / (fromIntegral $ aAmount assetB + swapAmount)
           , aName $ lAssetB pLiq
           )
     in Just $ mkAsset payOutName payOut
   | swapBForA =
     let (payOut, payOutName) =
              ( ceiling $ (fromIntegral $ (aAmount assetA) * (aAmount assetB))
-                            / (fromIntegral swapAmount)
+                            / (fromIntegral $ aAmount assetA + swapAmount)
              , aName $ lAssetA pLiq
              )
     in Just $ mkAsset payOutName payOut
