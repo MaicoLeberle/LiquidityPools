@@ -18,8 +18,8 @@ import Data.Aeson
 import Data.ByteString.Char8                  ( ByteString
                                               , unpack
                                               )
-import Data.Int                               ( Int64 )
-import Data.String                            ( fromString )
+import Data.Int                               (Int64 )
+import Data.String                            (fromString)
 import Database.PostgreSQL.Simple
 import GHC.Generics                           (Generic)
 import Text.Read
@@ -288,14 +288,14 @@ getPoolState conn poolID = do
                             (mkLiq (mkAsset aName oldA) (mkAsset bName oldB))
                             oldTokens
         _ -> except $ Left "Pool not found."
-        -- _ -> except $ Left $ "Error retrieving previous liquidity." ++ show (resPool, resTokens)
   where
     getPoolLiqQ :: Query
-    getPoolLiqQ = fromString $ concat [ "SELECT asset_name_A, asset_amount_A, "
-                                      , "asset_name_B, asset_amount_B, amount "
-                                      , "FROM pool JOIN liquidity_token ON poolID = key "
-                                      , "WHERE key = ?"
-                                      ]
+    getPoolLiqQ =
+        fromString $ concat [ "SELECT asset_name_A, asset_amount_A, "
+                            , "asset_name_B, asset_amount_B, amount "
+                            , "FROM pool JOIN liquidity_token ON poolID = key "
+                            , "WHERE key = ?"
+                            ]
 
     getTokensQ :: Query
     getTokensQ = fromString $ concat [ "SELECT amount "
@@ -494,7 +494,7 @@ addTokensToUser conn pass poolID tokens = ifM tokensExist update insert
                                conn updateUserTokensQ (tokens, poolID, pass)
         if rows == 1
         then return ()
-        else except $ Left $ "Could not update liquidity tokens for user." ++ show (tokens, poolID, pass)
+        else except $ Left $ "Could not update liquidity tokens for user."
 
     insert :: Transaction ()
     insert = do

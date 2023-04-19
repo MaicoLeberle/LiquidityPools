@@ -1,9 +1,12 @@
 {-# LANGUAGE RecordWildCards #-}
 
-import Network.Wai.Handler.Warp
+import Network.Wai.Handler.Warp ( defaultSettings
+                                , runSettings
+                                , setPort
+                                )
 
 import Server (app)
 
 
 main :: IO ()
-main = run 8081 app
+main = runSettings (setPort 8081 defaultSettings) app
