@@ -7,7 +7,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE RankNTypes         #-}
 
-module Database.Main where
+module Server.Database.Main where
 
 import Control.Monad                          (void)
 import Control.Monad.Extra                    (ifM)
@@ -24,17 +24,14 @@ import Database.PostgreSQL.Simple
 import GHC.Generics                           (Generic)
 import Text.Read
 
-import qualified Business          as B ( createUserID
-                                        , initialTokens
-                                        , newTokens
-                                        , rmLiq
-                                        , swap
-                                        )
-import           Database.Business      ( fromPoolRow
-                                        , fromAccountRows
-                                        )
-import           Database.Types
-import           Types
+import qualified Server.Business       as B ( createUserID
+                                            , initialTokens
+                                            , newTokens
+                                            , rmLiq
+                                            , swap
+                                            )
+import           Types.Base
+import           Types.Database
 
 
 pools :: IO GetPoolsRes

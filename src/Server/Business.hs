@@ -2,7 +2,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE TypeApplications   #-}
 
-module Business
+module Server.Business
     ( newTokens
     , initialTokens
     , createUserID
@@ -15,7 +15,7 @@ import           Data.List
 import qualified Data.Tuple as T
 import           System.Random
 
-import Types
+import Types.Base
 
 
 -- GET requests.

@@ -5,7 +5,7 @@ import Network.Wai.Handler.Warp ( defaultSettings
                                 , setPort
                                 )
 
-import Server (app)
+import Server.Server (app)
 
 
 main :: IO ()

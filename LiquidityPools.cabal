@@ -16,13 +16,12 @@ extra-source-files:  CHANGELOG.md
 cabal-version:       >=1.10
 
 executable LiquidityPoolsServer
-  main-is:             Main.hs
-  other-modules:         Business
-                       , Database.Business
-                       , Database.Main
-                       , Database.Types
-                       , Server
-                       , Types
+  main-is:             Server/Main.hs
+  other-modules:         Server.Business
+                       , Server.Database.Main
+                       , Server.Server
+                       , Types.Base
+                       , Types.Database
   build-depends:         aeson
                        , base >=4.12 && <4.13
                        , bytestring
@@ -33,16 +32,26 @@ executable LiquidityPoolsServer
                        , servant-server
                        , transformers
                        , warp
-  hs-source-dirs:      src/Server
+  hs-source-dirs:        src
   default-language:    Haskell2010
 
 executable LiquidityPoolsClient
-  main-is:             Main.hs
-  other-modules:       Types
+  main-is:             Client/Main.hs
+  other-modules:         Types.Base
+                       , Types.Database
   build-depends:         aeson
                        , base >=4.12 && <4.13
-                       , servant-server
-  hs-source-dirs:      src/Client
+                       , bytestring
+                       , containers
+                       , extra
+                       , http-client
+                       , postgresql-simple >=0.5 && <0.7
+                       , random
+                       , servant
+                       , servant-client
+                       , text
+                       , transformers
+  hs-source-dirs:      src
   default-language:    Haskell2010
 
 executable populateDB

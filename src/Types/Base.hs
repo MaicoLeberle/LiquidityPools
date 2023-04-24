@@ -4,7 +4,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE OverloadedStrings  #-}
 
-module Types
+module Types.Base
     ( Pool(..)
     , mkPool
     , Liq(..)
@@ -26,7 +26,7 @@ data Pool = Pool
     , pLiq       :: Liq
     , pLiqTokens :: Integer
     }
-  deriving (Eq, Show, Generic, ToJSON)
+  deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 mkPool :: Integer -> Liq -> Integer -> Pool
 mkPool = Pool

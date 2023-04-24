@@ -5,7 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators       #-}
 
-module Server ( app ) where
+module Server.Server (app) where
 
 import Control.Monad.IO.Class
 import Data.Aeson
@@ -14,10 +14,9 @@ import Network.Wai.Handler.Warp
 
 import Servant
 
-import           Business
-import qualified Database.Main  as DB
-import           Database.Types
-import           Types
+import           Server.Business
+import qualified Server.Database.Main  as DB
+import           Types.Database
 
 
 app :: Application
