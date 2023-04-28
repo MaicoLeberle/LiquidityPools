@@ -1,9 +1,7 @@
-{-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeOperators       #-}
 
 module Server.Server (app) where
 
@@ -15,30 +13,13 @@ import Network.Wai.Handler.Warp
 import Servant
 
 import           Server.Business
-import qualified Server.Database.Main  as DB
+import qualified Server.Database as DB
 import           Types.Database
+import           Types.API
 
 
 app :: Application
 app = serve (Proxy :: Proxy API) server
-
-type API =
-         "pools"        :> Get '[JSON] GetPoolsRes
-    :<|> "subscribe"    :> Get '[JSON] SubscribeRes
-    :<|> "account"      :> ReqBody '[JSON] GetAccountParams
-                        :> Post '[JSON] GetAccountRes
-    :<|> "addFunds"     :> ReqBody '[JSON] AddFundsParams
-                        :> Post '[JSON] AddFundsRes
-    :<|> "rmFunds"      :> ReqBody '[JSON] RmFundsParams
-                        :> Post '[JSON] RmFundsRes
-    :<|> "createPool"   :> ReqBody '[JSON] CreatePoolParams
-                        :> Post '[JSON] CreatePoolRes
-    :<|> "addLiquidity" :> ReqBody '[JSON] AddLiqParams
-                        :> Post '[JSON] AddLiqRes
-    :<|> "rmLiquidity"  :> ReqBody '[JSON] RmLiqParams
-                        :> Post '[JSON] RmLiqRes
-    :<|> "swap"         :> ReqBody '[JSON] SwapParams
-                        :> Post '[JSON] SwapRes
 
 server :: Server API
 server =      getPools

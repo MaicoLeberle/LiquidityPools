@@ -7,7 +7,7 @@
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE RankNTypes         #-}
 
-module Server.Database.Main where
+module Server.Database where
 
 import Control.Monad                          (void)
 import Control.Monad.Extra                    (ifM)

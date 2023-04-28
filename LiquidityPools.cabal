@@ -18,8 +18,9 @@ cabal-version:       >=1.10
 executable LiquidityPoolsServer
   main-is:             Server/Main.hs
   other-modules:         Server.Business
-                       , Server.Database.Main
+                       , Server.Database
                        , Server.Server
+                       , Types.API
                        , Types.Base
                        , Types.Database
   build-depends:         aeson
@@ -29,6 +30,7 @@ executable LiquidityPoolsServer
                        , extra
                        , postgresql-simple >=0.5 && <0.7
                        , random
+                       , servant
                        , servant-server
                        , transformers
                        , warp
@@ -38,6 +40,7 @@ executable LiquidityPoolsServer
 executable LiquidityPoolsClient
   main-is:             Client/Main.hs
   other-modules:         Types.Base
+                       , Types.API
                        , Types.Database
   build-depends:         aeson
                        , base >=4.12 && <4.13

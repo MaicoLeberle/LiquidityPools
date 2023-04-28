@@ -61,27 +61,6 @@ import GHC.Generics
 import Types.Base
 
 
-instance FromField Currency where
-    fromField :: Field -> Maybe ByteString -> Conversion Currency
-    fromField f Nothing = returnError UnexpectedNull f "Unexpected null."
-    fromField f (Just bs) =
-        case toMaybeCurrency bs of
-            Nothing -> returnError ConversionFailed f $ "Conversion failed."
-            Just res -> return res
-      where
-        toMaybeCurrency :: (Eq p, IsString p) => p -> Maybe Currency
-        toMaybeCurrency "ARS" = Just ARS
-        toMaybeCurrency "EUR" = Just EUR
-        toMaybeCurrency "GBP" = Just GBP
-        toMaybeCurrency "USD" = Just USD
-        toMaybeCurrency     _ = Nothing
-
-instance ToField Currency where
-    toField :: Currency -> Action
-    toField = Escape . pack . show
-
-
-
 {-| Type Transaction allows for a compact and maintainable implementation of
     error-prone, multi-query sessions with the database backend.
 -}
@@ -193,3 +172,25 @@ data SwapParams = SwapParams
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 type SwapRes = Either String Asset
+
+{-| FromField and ToField intances for Currency are required to parse results
+    from database queries.
+-}
+instance FromField Currency where
+    fromField :: Field -> Maybe ByteString -> Conversion Currency
+    fromField f Nothing = returnError UnexpectedNull f "Unexpected null."
+    fromField f (Just bs) =
+        case toMaybeCurrency bs of
+            Nothing -> returnError ConversionFailed f $ "Conversion failed."
+            Just res -> return res
+      where
+        toMaybeCurrency :: (Eq p, IsString p) => p -> Maybe Currency
+        toMaybeCurrency "ARS" = Just ARS
+        toMaybeCurrency "EUR" = Just EUR
+        toMaybeCurrency "GBP" = Just GBP
+        toMaybeCurrency "USD" = Just USD
+        toMaybeCurrency     _ = Nothing
+
+instance ToField Currency where
+    toField :: Currency -> Action
+    toField = Escape . pack . show
