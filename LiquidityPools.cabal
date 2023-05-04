@@ -32,6 +32,7 @@ executable LiquidityPoolsServer
                        , random
                        , servant
                        , servant-server
+                       , template-haskell
                        , transformers
                        , warp
   hs-source-dirs:        src

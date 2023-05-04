@@ -35,20 +35,19 @@ myAPI = Proxy
  :<|> rmLiquidity
  :<|> swap         ) = client myAPI
 
+-- main :: IO ()
+-- main = do
+--   manager <- newManager defaultManagerSettings
+--   pools <- runClientM getPools
+--                       (mkClientEnv manager (BaseUrl Http "localhost" 8081 ""))
+--   case pools of
+--     Left err -> putStrLn $ "Error: " ++ show err
+--     Right res -> print res
+
 main :: IO ()
 main = do
-  manager <- newManager defaultManagerSettings
-  pools <- runClientM getPools
-                      (mkClientEnv manager (BaseUrl Http "localhost" 8081 ""))
-  case pools of
-    Left err -> putStrLn $ "Error: " ++ show err
-    Right res -> print res
-
-
-main' :: IO ()
-main' = do
     putStrLn "A CLI for the liquidity pools client."
-    putStrLn "(\":q\" or CTRL+C to quit)\n"
+    putStrLn "(:q or CTRL+C to quit)\n"
     manager <- newManager defaultManagerSettings
     runInputT defaultSettings
               (loop (mkClientEnv manager (BaseUrl Http "localhost" 8081 "")))
@@ -57,15 +56,15 @@ loop :: ClientEnv -> InputT IO ()
 loop env = printMenu >> execAction env
 
 printMenu :: InputT IO ()
-printMenu = outputStrLn $ concat  [ "1. List active pools."
-                                  , "2. Subscribe new account."
-                                  , "3. Retrieve account state."
-                                  , "4. Add funds to an existing account."
-                                  , "5. Remove funds from an existing account."
-                                  , "6. Create pool."
-                                  , "7. Add liquidity."
-                                  , "8. Remove liquidity."
-                                  , "9. Swap assets."
+printMenu = outputStrLn $ concat  [ "1. List active pools.\n"
+                                  , "2. Subscribe new account.\n"
+                                  , "3. Retrieve account state.\n"
+                                  , "4. Add funds to an existing account.\n"
+                                  , "5. Remove funds from an existing account.\n"
+                                  , "6. Create pool.\n"
+                                  , "7. Add liquidity.\n"
+                                  , "8. Remove liquidity.\n"
+                                  , "9. Swap assets.\n"
                                   ]
 
 execAction :: ClientEnv -> InputT IO ()
@@ -82,6 +81,7 @@ execAction env = do maybeOption <- getInputLine "Option: "
                                  | res == "8"   -> rmLiquidity' env
                                  | res == "9"   -> swap' env
                                  | res == ":q"  -> return ()
+                                 | otherwise    -> execAction env
 
 getPools' :: ClientEnv -> InputT IO ()
 getPools' env = lift (runClientM getPools env) >>= printRes >> loop env
@@ -279,9 +279,12 @@ addLiqAux func pCons env =
                     loop env
 
 printRes :: Show a => Either ClientError (Either String a) -> InputT IO ()
-printRes (Left         clientErr) = outputStrLn $ show clientErr
-printRes (Right (Left customErr)) = outputStrLn customErr
-printRes (Right (Right      res)) = outputStrLn $ show res
+printRes (Left clientErr) =
+    outputStrLn $ "\n" ++  show clientErr ++ "\n"
+printRes (Right (Left customErr)) =
+    outputStrLn $ "\n" ++  customErr ++ "\n"
+printRes (Right (Right res)) =
+    outputStrLn $ "\n" ++  show res ++ "\n"
 
 currKinds :: String
 currKinds = "(" ++ aux $(fieldNames ''Currency) ++ ")"
