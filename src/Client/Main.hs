@@ -7,17 +7,20 @@ module Main where
 import Control.Monad
 import Control.Monad.Trans.Class
 import Data.Proxy
-import Data.String (fromString)
-import Network.HTTP.Client      (newManager, defaultManagerSettings, Manager(..))
-import Language.Haskell.TH
+import Data.String               (fromString)
+import Network.HTTP.Client       ( newManager
+                                 , defaultManagerSettings
+                                 , Manager(..)
+                                 )
 import Servant.API
 import Servant.Client
 import System.Console.Haskeline
-import Text.Read (readMaybe)
+import Text.Read                 (readMaybe)
 
 import Types.Base
 import Types.Database
 import Types.API
+
 
 myAPI :: Proxy API
 myAPI = Proxy
@@ -105,7 +108,7 @@ addFunds' env =
   where
     getCurr :: AddFundsParams -> InputT IO ()
     getCurr afp =
-        do maybeCurr <- getInputLine "Currency kind (ARS, EUR, GBP, USD): "
+        do maybeCurr <- getInputLine $ "Currency kind " ++ currKinds ++ ": "
            case maybeCurr >>= readMaybe @Currency of
                 Nothing   -> getCurr afp
                 Just curr -> getAmount afp { afpAsset = mkAsset curr undefined}
@@ -131,7 +134,7 @@ rmFunds' env =
   where
     getCurr :: RmFundsParams -> InputT IO ()
     getCurr rfp =
-        do maybeCurr <- getInputLine "Currency kind (ARS, EUR, GBP, USD): "
+        do maybeCurr <- getInputLine $ "Currency kind " ++ currKinds ++ ": "
            case maybeCurr >>= readMaybe @Currency of
                 Nothing   -> getCurr rfp
                 Just curr -> getAmount rfp { rfpAsset = mkAsset curr undefined}
@@ -197,7 +200,7 @@ swap' env =
 
     getCurr :: SwapParams -> InputT IO ()
     getCurr sp@SwapParams{..} =
-        do maybeAmount <- getInputLine "Currency kind (ARS, EUR, GBP, USD): "
+        do maybeAmount <- getInputLine $ "Currency kind " ++ currKinds ++ ": "
            case maybeAmount >>= readMaybe @Currency of
                 Nothing   -> getCurr sp
                 Just curr -> getAmount sp {spAsset = spAsset {aName = curr}}
@@ -233,7 +236,7 @@ addLiqAux func pCons env =
     getFirstCurr :: (Password, Liq) -> InputT IO ()
     getFirstCurr (pass, liq) =
         do maybeCurr <-
-                getInputLine "First currency kind (ARS, EUR, GBP, USD): "
+                getInputLine $ "First currency kind " ++ currKinds ++ ": "
            case maybeCurr >>= readMaybe @Currency of
                 Nothing   -> getFirstCurr (pass, liq)
                 Just curr -> getFirstAmount ( pass
@@ -255,7 +258,7 @@ addLiqAux func pCons env =
     getSecCurr :: (Password, Liq) -> InputT IO ()
     getSecCurr (pass, liq) =
         do maybeCurr <-
-            getInputLine "Second currency kind (ARS, EUR, GBP, USD): "
+                getInputLine $ "Second currency kind " ++ currKinds ++ ": "
            case maybeCurr >>= readMaybe @Currency of
                 Nothing   -> getSecCurr (pass, liq)
                 Just curr ->
@@ -279,3 +282,11 @@ printRes :: Show a => Either ClientError (Either String a) -> InputT IO ()
 printRes (Left         clientErr) = outputStrLn $ show clientErr
 printRes (Right (Left customErr)) = outputStrLn customErr
 printRes (Right (Right      res)) = outputStrLn $ show res
+
+currKinds :: String
+currKinds = "(" ++ aux $(fieldNames ''Currency) ++ ")"
+  where
+    aux :: [String] -> String
+    aux     [] = ""
+    aux    [c] = c
+    aux (c:cc) = c ++ ", " ++ aux cc

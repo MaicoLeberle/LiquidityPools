@@ -1,8 +1,9 @@
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE RankNTypes         #-}
-{-# LANGUAGE RecordWildCards    #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE RankNTypes        #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Types.Base
     ( Pool(..)
@@ -12,6 +13,7 @@ module Types.Base
     , Asset(..)
     , mkAsset
     , Currency(..)
+    , fieldNames
     , Account(..)
     , mkAccount
     , Password
@@ -19,6 +21,7 @@ module Types.Base
 
 import Data.Aeson
 import GHC.Generics
+import Language.Haskell.TH
 
 
 data Pool = Pool
@@ -55,6 +58,16 @@ data Currency =
     | GBP
     | USD
   deriving (Eq, Ord, Show, Read, Generic, ToJSON, FromJSON)
+
+-- | fieldNames is used to list Currency data constructors in client side app.
+fieldNames :: Name -> ExpQ
+fieldNames t = do
+    TyConI (DataD _ _ _ _ constructors _) <- reify t
+    let ns = map names constructors
+    [| ns |]
+  where
+    names :: Con -> String
+    names (NormalC name _) = nameBase name
 
 data Account = Account
     { aUserID :: Password
