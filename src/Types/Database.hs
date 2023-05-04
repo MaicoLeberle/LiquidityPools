@@ -22,6 +22,7 @@ module Types.Database
     , fromAccountRows
         -- | Create pool, with utils to add the initial liquidity.
     , CreatePoolParams(..)
+    , mkCreatePoolParams
     , CreatePoolRes
     , createPoolParamsToAddLiq
         -- | Create new user and retrieve password.
@@ -34,6 +35,7 @@ module Types.Database
     , RmFundsRes
         -- | Add liquidity from an account to a pool.
     , AddLiqParams(..)
+    , mkAddLiqParams
     , AddLiqRes
         -- | Remove liquidity from a pool to an account.
     , RmLiqParams(..)
@@ -53,7 +55,7 @@ import Data.List
 import Data.Map                             as M ( insertWith
                                                  , toList
                                                  )
-import Data.String                          (IsString)
+import Data.String                          (IsString, fromString)
 import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.ToField
 import GHC.Generics
@@ -87,6 +89,9 @@ fromPoolRow (pID, aAsset, aAmount, bAsset, bAmount, tokens) =
 newtype GetAccountParams = GetAccountParams { gapID :: String }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
+instance IsString GetAccountParams where
+    fromString = GetAccountParams
+
 type GetAccountRes = Either String Account
 
 type AccountRow = ( Currency -- Asset name
@@ -116,6 +121,9 @@ data CreatePoolParams = CreatePoolParams
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
+mkCreatePoolParams :: Password -> Liq -> CreatePoolParams
+mkCreatePoolParams = CreatePoolParams
+
 type CreatePoolRes = Either String Integer
 
 type SubscribeRes = Either String Password
@@ -144,6 +152,9 @@ data AddLiqParams = AddLiqParams
     , alpLiq      :: Liq
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+mkAddLiqParams :: Password -> Liq -> AddLiqParams
+mkAddLiqParams = AddLiqParams
 
 type AddLiqRes = Either String Integer
 

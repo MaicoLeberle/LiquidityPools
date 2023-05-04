@@ -47,11 +47,13 @@ executable LiquidityPoolsClient
                        , bytestring
                        , containers
                        , extra
+                       , haskeline >=0.7 && <0.8
                        , http-client
                        , postgresql-simple >=0.5 && <0.7
                        , random
                        , servant
                        , servant-client
+                       , template-haskell
                        , text
                        , transformers
   hs-source-dirs:      src

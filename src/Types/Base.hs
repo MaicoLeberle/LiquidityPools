@@ -54,7 +54,7 @@ data Currency =
     | EUR
     | GBP
     | USD
-  deriving (Eq, Ord, Show, Generic, ToJSON, FromJSON)
+  deriving (Eq, Ord, Show, Read, Generic, ToJSON, FromJSON)
 
 data Account = Account
     { aUserID :: Password
