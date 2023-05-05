@@ -1,6 +1,8 @@
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards  #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Main where
 
@@ -35,15 +37,6 @@ myAPI = Proxy
  :<|> rmLiquidity
  :<|> swap         ) = client myAPI
 
--- main :: IO ()
--- main = do
---   manager <- newManager defaultManagerSettings
---   pools <- runClientM getPools
---                       (mkClientEnv manager (BaseUrl Http "localhost" 8081 ""))
---   case pools of
---     Left err -> putStrLn $ "Error: " ++ show err
---     Right res -> print res
-
 main :: IO ()
 main = do
     putStrLn "A CLI for the liquidity pools client."
@@ -56,16 +49,16 @@ loop :: ClientEnv -> InputT IO ()
 loop env = printMenu >> execAction env
 
 printMenu :: InputT IO ()
-printMenu = outputStrLn $ concat  [ "1. List active pools.\n"
-                                  , "2. Subscribe new account.\n"
-                                  , "3. Retrieve account state.\n"
-                                  , "4. Add funds to an existing account.\n"
-                                  , "5. Remove funds from an existing account.\n"
-                                  , "6. Create pool.\n"
-                                  , "7. Add liquidity.\n"
-                                  , "8. Remove liquidity.\n"
-                                  , "9. Swap assets.\n"
-                                  ]
+printMenu = outputStrLn $ concat [ "1. List active pools.\n"
+                                 , "2. Subscribe new account.\n"
+                                 , "3. Retrieve account state.\n"
+                                 , "4. Add funds to an existing account.\n"
+                                 , "5. Remove funds from an existing account.\n"
+                                 , "6. Create pool.\n"
+                                 , "7. Add liquidity.\n"
+                                 , "8. Remove liquidity.\n"
+                                 , "9. Swap assets.\n"
+                                 ]
 
 execAction :: ClientEnv -> InputT IO ()
 execAction env = do maybeOption <- getInputLine "Option: "
@@ -84,72 +77,57 @@ execAction env = do maybeOption <- getInputLine "Option: "
                                  | otherwise    -> execAction env
 
 getPools' :: ClientEnv -> InputT IO ()
-getPools' env = lift (runClientM getPools env) >>= printRes >> loop env
+getPools' = getRequests getPools
 
 subscribe' :: ClientEnv -> InputT IO ()
-subscribe' env = lift (runClientM subscribe env) >>= printRes >> loop env
+subscribe' = getRequests subscribe
 
 getAccount' :: ClientEnv -> InputT IO ()
 getAccount' env =
     do maybePass <- getInputLine "Password: "
        case maybePass of
            Nothing -> getAccount' env
-           Just pass ->
-                do res <- lift (runClientM (getAccount $ fromString pass) env)
-                   printRes res
-                   loop env
+           Just pass -> callEndpoint env getAccount (fromString pass)
 
 addFunds' :: ClientEnv -> InputT IO ()
 addFunds' env =
-    do maybePass <- getInputLine "Password: "
-       case maybePass of
-            Nothing -> addFunds' env
-            Just pass -> getCurr $ AddFundsParams pass undefined
+        updParams @AddFundsParams @Password "Password: " insPass initAddFundsP
+    >>= updParams @AddFundsParams @Currency
+            ("Currency kind " ++ currencyKinds ++ ": ") insCurr
+    >>= updParams @AddFundsParams @Integer "Amount: " insAmount
+    >>= callEndpoint env addFunds
   where
-    getCurr :: AddFundsParams -> InputT IO ()
-    getCurr afp =
-        do maybeCurr <- getInputLine $ "Currency kind " ++ currKinds ++ ": "
-           case maybeCurr >>= readMaybe @Currency of
-                Nothing   -> getCurr afp
-                Just curr -> getAmount afp { afpAsset = mkAsset curr undefined}
+    initAddFundsP :: AddFundsParams
+    initAddFundsP = mkAddFundsParams undefined undefined
 
-    getAmount :: AddFundsParams -> InputT IO ()
-    getAmount afp@AddFundsParams{..} =
-        do maybeAmount <- getInputLine "Amount: "
-           case maybeAmount >>= readMaybe @Integer of
-                Nothing -> getAmount afp
-                Just amount ->
-                    do let finalAfp =
-                            afp { afpAsset = afpAsset {aAmount = amount}}
-                       res <- lift $ runClientM (addFunds finalAfp) env
-                       printRes res
-                       loop env
+    insPass :: AddFundsParams -> Password -> AddFundsParams
+    insPass afp pass = afp {afpPassword = pass}
+
+    insCurr :: AddFundsParams -> Currency -> AddFundsParams
+    insCurr afp c = afp {afpAsset = mkAsset c undefined}
+
+    insAmount :: AddFundsParams -> Integer -> AddFundsParams
+    insAmount afp n = afp {afpAsset = (afpAsset afp) {aAmount = n}}
 
 rmFunds' :: ClientEnv -> InputT IO ()
 rmFunds' env =
-    do maybePass <- getInputLine "Password: "
-       case maybePass of
-            Nothing -> rmFunds' env
-            Just pass -> getCurr $ RmFundsParams pass undefined
+        updParams @RmFundsParams @Password "Password: " insPass initRmFundsP
+    >>= updParams @RmFundsParams @Currency
+            ("Currency kind " ++ currencyKinds ++ ": ") insCurr
+    >>= updParams @RmFundsParams @Integer "Amount: " insAmount
+    >>= callEndpoint env rmFunds
   where
-    getCurr :: RmFundsParams -> InputT IO ()
-    getCurr rfp =
-        do maybeCurr <- getInputLine $ "Currency kind " ++ currKinds ++ ": "
-           case maybeCurr >>= readMaybe @Currency of
-                Nothing   -> getCurr rfp
-                Just curr -> getAmount rfp { rfpAsset = mkAsset curr undefined}
+    initRmFundsP :: RmFundsParams
+    initRmFundsP = mkRmFundsParams undefined undefined
 
-    getAmount :: RmFundsParams -> InputT IO ()
-    getAmount rfp@RmFundsParams{..} =
-        do maybeAmount <- getInputLine "Amount: "
-           case maybeAmount >>= readMaybe @Integer of
-                Nothing -> getAmount rfp
-                Just amount ->
-                    do let finalRfp =
-                            rfp { rfpAsset = rfpAsset {aAmount = amount}}
-                       res <- lift $ runClientM (rmFunds finalRfp) env
-                       printRes res
-                       loop env
+    insPass :: RmFundsParams -> Password -> RmFundsParams
+    insPass rfp pass = rfp {rfpPassword = pass}
+
+    insCurr :: RmFundsParams -> Currency -> RmFundsParams
+    insCurr rfp c = rfp {rfpAsset = mkAsset c undefined}
+
+    insAmount  :: RmFundsParams -> Integer -> RmFundsParams
+    insAmount rfp n = rfp {rfpAsset = (rfpAsset rfp) {aAmount = n}}
 
 createPool' :: ClientEnv -> InputT IO ()
 createPool' = addLiqAux createPool mkCreatePoolParams
@@ -159,124 +137,95 @@ addLiquidity' = addLiqAux addLiquidity mkAddLiqParams
 
 rmLiquidity' :: ClientEnv -> InputT IO ()
 rmLiquidity' env =
-    do maybePass <- getInputLine "Password: "
-       case maybePass of
-            Nothing -> rmLiquidity' env
-            Just pass -> getPoolID $ RmLiqParams pass undefined undefined
+        updParams @RmLiqParams @Password "Password: " insPass initRmLiqP
+    >>= updParams @RmLiqParams @Integer "Pool ID: " insPoolID
+    >>= updParams @RmLiqParams @Integer
+            "Number of tokens to exchange: " insTokens
+    >>= callEndpoint env rmLiquidity
   where
-    getPoolID :: RmLiqParams -> InputT IO ()
-    getPoolID rlp =
-        do maybeCurr <- getInputLine "Pool ID: "
-           case maybeCurr >>= readMaybe @Integer of
-                Nothing   -> getPoolID rlp
-                Just id -> getTokens rlp {rlpPoolID = id}
+    initRmLiqP :: RmLiqParams
+    initRmLiqP = mkRmLiqParams undefined undefined undefined
 
-    getTokens :: RmLiqParams -> InputT IO ()
-    getTokens rlp =
-        do maybeAmount <- getInputLine "Number of tokens to exchange: "
-           case maybeAmount >>= readMaybe @Integer of
-                Nothing -> getTokens rlp
-                Just amount ->
-                    do let finalrlp = rlp {rlpTokens = amount}
-                       res <- lift $ runClientM
-                                        (rmLiquidity rlp {rlpTokens = amount})
-                                        env
-                       printRes res
-                       loop env
+    insPass :: RmLiqParams -> Password -> RmLiqParams
+    insPass rlp pass = rlp {rlpPassword = pass}
+
+    insPoolID :: RmLiqParams -> Integer -> RmLiqParams
+    insPoolID rlp id = rlp {rlpPoolID = id}
+
+    insTokens :: RmLiqParams -> Integer -> RmLiqParams
+    insTokens rlp n = rlp {rlpTokens = n}
 
 swap' :: ClientEnv -> InputT IO ()
 swap' env =
-    do maybePass <- getInputLine "Password: "
-       case maybePass of
-            Nothing -> createPool' env
-            Just pass -> getPoolID $ SwapParams pass undefined undefined
+        updParams @SwapParams @Password "Password: " insPass initSwapP
+    >>= updParams @SwapParams @Integer "Pool ID: " insPoolID
+    >>= updParams @SwapParams @Currency ("Currency " ++ currencyKinds ++ ": ")
+                                        insCurr
+    >>= updParams @SwapParams @Integer "Amount: " insAmount
+    >>= callEndpoint env swap
   where
-    getPoolID :: SwapParams -> InputT IO ()
-    getPoolID sp =
-        do maybeCurr <- getInputLine "Pool ID: "
-           case maybeCurr >>= readMaybe @Integer of
-                Nothing -> getPoolID sp
-                Just id -> getCurr sp {spPoolID = id}
+    initSwapP :: SwapParams
+    initSwapP = SwapParams undefined undefined undefined
 
-    getCurr :: SwapParams -> InputT IO ()
-    getCurr sp@SwapParams{..} =
-        do maybeAmount <- getInputLine $ "Currency kind " ++ currKinds ++ ": "
-           case maybeAmount >>= readMaybe @Currency of
-                Nothing   -> getCurr sp
-                Just curr -> getAmount sp {spAsset = spAsset {aName = curr}}
+    insPass :: SwapParams -> Password -> SwapParams
+    insPass sp pass = sp {spPassword = pass}
 
-    getAmount :: SwapParams -> InputT IO ()
-    getAmount sp@SwapParams{..} =
-        do maybeCurr <- getInputLine "Amount: "
-           case maybeCurr >>= readMaybe @Integer of
-                Nothing     -> getAmount sp
-                Just amount ->
-                    do let finalSp = sp {spAsset = spAsset {aAmount = amount}}
-                       res <- lift $ runClientM (swap finalSp) env
-                       printRes res
-                       loop env
+    insPoolID :: SwapParams -> Integer -> SwapParams
+    insPoolID sp id = sp {spPoolID = id}
 
+    insCurr :: SwapParams -> Currency -> SwapParams
+    insCurr sp c = sp {spAsset = mkAsset c undefined}
+
+    insAmount :: SwapParams -> Integer -> SwapParams
+    insAmount sp am = sp {spAsset = (spAsset sp) {aAmount = am}}
 
 -- | Auxiliary utils.
+-- | getRequests generalizes GET HTTP requests, namely getPools and subscribe.
+getRequests :: Show a => ClientM (Either String a) -> ClientEnv -> InputT IO ()
+getRequests action env = lift (runClientM action env) >>= printRes >> loop env
+
 {-| addLiqAux is used both for the createPool and addLiquidity endpoints, whose
     respective parameter types, namely CreatePoolParams and AddLiqParams, are
     isomorphic, hence the code for the user to input them should be shared.
 -}
-addLiqAux :: Show b
+addLiqAux :: forall a b
+          . Show b
           => (a -> ClientM (Either String b))
           -> (Password -> Liq -> a)
           -> ClientEnv
           -> InputT IO ()
-addLiqAux func pCons env =
-    do maybePass <- getInputLine "Password: "
-       case maybePass of
-            Nothing -> createPool' env
-            Just pass -> getFirstCurr $ (pass, undefined)
+addLiqAux func paramsCons env =
+        updParams @(Password, Liq) @Password "Password: " insPass initParams
+    >>= updParams @(Password, Liq) @Currency
+            ("First currency " ++ currencyKinds ++ ": ") insFstCurr
+    >>= updParams @(Password, Liq) @Integer "Amount: " insFstAmount
+    >>= updParams @(Password, Liq) @Currency
+            ("Second currency " ++ currencyKinds ++ ": ") insSndCurr
+    >>= updParams @(Password, Liq) @Integer "Amount: " insSndAmount
+    >>= return . uncurry paramsCons
+    >>= callEndpoint env func
   where
-    getFirstCurr :: (Password, Liq) -> InputT IO ()
-    getFirstCurr (pass, liq) =
-        do maybeCurr <-
-                getInputLine $ "First currency kind " ++ currKinds ++ ": "
-           case maybeCurr >>= readMaybe @Currency of
-                Nothing   -> getFirstCurr (pass, liq)
-                Just curr -> getFirstAmount ( pass
-                                            , mkLiq (mkAsset curr undefined)
-                                                    undefined
-                                            )
+    initParams :: (Password, Liq)
+    initParams = (undefined, undefined)
 
-    getFirstAmount :: (Password, Liq) -> InputT IO ()
-    getFirstAmount (pass, liq) =
-        do maybeAmount <- getInputLine "Amount: "
-           case maybeAmount >>= readMaybe @Integer of
-                Nothing -> getFirstAmount (pass, liq)
-                Just amount ->
-                    getSecCurr ( pass
-                               , liq {lAssetA =
-                                        (lAssetA liq) {aAmount = amount}}
-                               )
+    insPass :: (Password, Liq) -> Password -> (Password, Liq)
+    insPass (_, liq) pass = (pass, liq)
 
-    getSecCurr :: (Password, Liq) -> InputT IO ()
-    getSecCurr (pass, liq) =
-        do maybeCurr <-
-                getInputLine $ "Second currency kind " ++ currKinds ++ ": "
-           case maybeCurr >>= readMaybe @Currency of
-                Nothing   -> getSecCurr (pass, liq)
-                Just curr ->
-                    getSecAmount ( pass
-                                 , liq {lAssetB = (lAssetB liq) {aName = curr}}
-                                 )
+    insFstCurr :: (Password, Liq) -> Currency -> (Password, Liq)
+    insFstCurr (pass, liq) fc =
+        (pass, liq {lAssetA = mkAsset fc undefined})
 
-    getSecAmount :: (Password, Liq) -> InputT IO ()
-    getSecAmount (pass, liq) =
-        do maybeAmount <- getInputLine "Amount: "
-           case maybeAmount >>= readMaybe @Integer of
-                Nothing -> getFirstAmount (pass, liq)
-                Just amount -> do
-                    let finalLiq =
-                            liq {lAssetB = (lAssetB liq) {aAmount = amount}}
-                    res <- lift $ runClientM (func $ pCons pass finalLiq) env
-                    printRes res
-                    loop env
+    insFstAmount :: (Password, Liq) -> Integer -> (Password, Liq)
+    insFstAmount (pass, liq) fa =
+        (pass, liq {lAssetA = (lAssetA liq) {aAmount = fa}})
+
+    insSndCurr :: (Password, Liq) -> Currency -> (Password, Liq)
+    insSndCurr (pass, liq) sc =
+        (pass, liq {lAssetA = mkAsset sc undefined})
+
+    insSndAmount :: (Password, Liq) -> Integer -> (Password, Liq)
+    insSndAmount (pass, liq) sa =
+        (pass, liq {lAssetB = (lAssetB liq) {aAmount = sa}})
 
 printRes :: Show a => Either ClientError (Either String a) -> InputT IO ()
 printRes (Left clientErr) =
@@ -286,10 +235,33 @@ printRes (Right (Left customErr)) =
 printRes (Right (Right res)) =
     outputStrLn $ "\n" ++  show res ++ "\n"
 
-currKinds :: String
-currKinds = "(" ++ aux $(fieldNames ''Currency) ++ ")"
+currencyKinds :: String
+currencyKinds = "(" ++ concatCurrKinds $(fieldNames ''Currency) ++ ")"
   where
-    aux :: [String] -> String
-    aux     [] = ""
-    aux    [c] = c
-    aux (c:cc) = c ++ ", " ++ aux cc
+    concatCurrKinds :: [String] -> String
+    concatCurrKinds     [] = ""
+    concatCurrKinds    [c] = c
+    concatCurrKinds (c:cc) = c ++ ", " ++ concatCurrKinds cc
+
+updParams :: forall a b
+          . Read b
+          => String
+          -> (a -> b -> a)
+          -> a
+          -> InputT IO a
+updParams msg updAcc acc =
+    do maybeNewVal <- getInputLine msg
+       case maybeNewVal >>= readMaybe @b of
+            Nothing -> updParams msg updAcc acc
+            Just newVal -> return $ updAcc acc newVal
+
+callEndpoint :: forall a b
+             . Show b
+             => ClientEnv
+             -> (a -> ClientM (Either String b))
+             -> a
+             -> InputT IO ()
+callEndpoint env endpoint param =
+    do res <- lift $ runClientM (endpoint param) env
+       printRes res
+       loop env

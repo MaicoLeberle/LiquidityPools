@@ -29,9 +29,11 @@ module Types.Database
     , SubscribeRes
         -- | Add funds to an account.
     , AddFundsParams(..)
+    , mkAddFundsParams
     , AddFundsRes
         -- | Remove funds from an account.
     , RmFundsParams(..)
+    , mkRmFundsParams
     , RmFundsRes
         -- | Add liquidity from an account to a pool.
     , AddLiqParams(..)
@@ -39,6 +41,7 @@ module Types.Database
     , AddLiqRes
         -- | Remove liquidity from a pool to an account.
     , RmLiqParams(..)
+    , mkRmLiqParams
     , RmLiqRes
         -- Swap liquidity at a pool.
     , SwapParams(..)
@@ -135,6 +138,9 @@ data AddFundsParams = AddFundsParams
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
+mkAddFundsParams :: Password -> Asset -> AddFundsParams
+mkAddFundsParams = AddFundsParams
+
 type AddFundsRes = Either String ()
 
 -- | rmFunds endpoint.
@@ -143,6 +149,9 @@ data RmFundsParams = RmFundsParams
     , rfpAsset :: Asset
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+mkRmFundsParams :: Password -> Asset -> RmFundsParams
+mkRmFundsParams = RmFundsParams
 
 type RmFundsRes = Either String ()
 
@@ -166,11 +175,14 @@ createPoolParamsToAddLiq cpp = AddLiqParams { alpPassword = cppPassword cpp
 
 -- | rmLiquidity endpoint.
 data RmLiqParams = RmLiqParams
-    { rlpPass   :: Password
-    , rlpPoolID :: Integer
-    , rlpTokens :: Integer
+    { rlpPassword :: Password
+    , rlpPoolID   :: Integer
+    , rlpTokens   :: Integer
     }
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
+
+mkRmLiqParams :: Password -> Integer -> Integer -> RmLiqParams
+mkRmLiqParams = RmLiqParams
 
 type RmLiqRes = Either String Liq
 

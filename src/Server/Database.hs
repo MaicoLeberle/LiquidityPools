@@ -185,13 +185,13 @@ rmLiquidity rlp@RmLiqParams{..}
 
     trans :: Connection -> Transaction Liq
     trans conn = do
-        checkUserExists conn rlpPass
+        checkUserExists conn rlpPassword
         pool <- getPoolState conn rlpPoolID
         liq <- rmLiqFromPool pool
         rmTokensFromPool rlpPoolID conn rlpTokens
-        rmTokensFromUser conn rlpPass rlpPoolID rlpTokens
-        addAssetToUser rlpPass (lAssetA liq) conn
-        addAssetToUser rlpPass (lAssetB liq) conn
+        rmTokensFromUser conn rlpPassword rlpPoolID rlpTokens
+        addAssetToUser rlpPassword (lAssetA liq) conn
+        addAssetToUser rlpPassword (lAssetB liq) conn
         return liq
       where
         mkRmLiq :: Pool -> Integer -> Integer -> (Asset, Asset)
