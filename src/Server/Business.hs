@@ -1,6 +1,5 @@
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE RecordWildCards    #-}
-{-# LANGUAGE TypeApplications   #-}
 
 module Server.Business
     ( newTokens
@@ -11,8 +10,9 @@ module Server.Business
     , swap
     ) where
 
+import           Control.Monad (replicateM)
 import           Data.List
-import qualified Data.Tuple as T
+import qualified Data.Tuple    as T
 import           System.Random
 
 import Types.Base
@@ -23,13 +23,13 @@ createUserID :: IO Password
 createUserID = newUserID 30
 
 newUserID :: Int -> IO String
-newUserID n = map (vals !!) <$> (randomChar n 0 $ length vals - 1)
+newUserID n = map (vals !!) <$> randomChar n 0 (length vals - 1)
   where
     vals :: String
     vals = ['0'..'9'] ++ ['A'..'Z']
 
     randomChar :: Int -> Int -> Int -> IO [Int]
-    randomChar n a b = sequence $ take n $ repeat $ randomRIO (a, b)
+    randomChar n a b = replicateM n (randomRIO (a, b))
 
 -- POST requests.
 {-  The number of new LP tokens is given by the underlying theory--c.f.
@@ -90,15 +90,16 @@ swap :: Pool -> Asset -> Maybe Asset
 swap p@Pool{..} Asset{aName = swapName, aAmount = swapAmount}
   | swapAForB =
     let (payOut, payOutName) =
-          ( ceiling $ (fromIntegral $ (aAmount assetA) * (aAmount assetB))
-                              / (fromIntegral $ aAmount assetB + swapAmount)
+          ( ceiling $ fromIntegral (aAmount assetA * aAmount assetB)
+                              / fromIntegral (aAmount assetB + swapAmount)
           , aName $ lAssetB pLiq
           )
     in Just $ mkAsset payOutName payOut
   | swapBForA =
     let (payOut, payOutName) =
-             ( ceiling $ (fromIntegral $ (aAmount assetA) * (aAmount assetB))
-                            / (fromIntegral $ aAmount assetA + swapAmount)
+             ( ceiling $
+                  fromIntegral (aAmount assetA * aAmount assetB)
+                      / fromIntegral (aAmount assetA + swapAmount)
              , aName $ lAssetA pLiq
              )
     in Just $ mkAsset payOutName payOut

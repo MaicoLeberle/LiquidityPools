@@ -1,6 +1,4 @@
 {-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE RecordWildCards     #-}
-{-# LANGUAGE TypeApplications    #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Server.Server (app) where
@@ -34,38 +32,33 @@ server =      getPools
 
   where
     getPools :: Handler GetPoolsRes
-    getPools = runOnDB DB.pools
+    getPools = liftIO DB.pools
 
     subscribe :: Handler SubscribeRes
-    subscribe = runOnDB DB.subscribe
+    subscribe = liftIO DB.subscribe
 
     getAccount :: GetAccountParams -> Handler GetAccountRes
-    getAccount = runOnDB . DB.getAccount
+    getAccount = liftIO . DB.getAccount
 
       -- Add a single asset to the account.
     addFunds :: AddFundsParams -> Handler AddFundsRes
-    addFunds = runOnDB . DB.addFunds
+    addFunds = liftIO . DB.addFunds
 
       -- Remove a single asset from the account.
     rmFunds :: RmFundsParams -> Handler RmFundsRes
-    rmFunds = runOnDB . DB.rmFunds
+    rmFunds = liftIO . DB.rmFunds
 
       -- Returns number of new liquidity tokens.
     createPool :: CreatePoolParams -> Handler CreatePoolRes
-    createPool = runOnDB . DB.createPool
+    createPool = liftIO . DB.createPool
 
       -- Returns number of new liquidity tokens.
     addLiquidity :: AddLiqParams -> Handler AddLiqRes
-    addLiquidity = runOnDB . DB.addLiquidity
+    addLiquidity = liftIO . DB.addLiquidity
 
       -- Returns liquidity removed from pool.
     rmLiquidity :: RmLiqParams -> Handler RmLiqRes
-    rmLiquidity = runOnDB . DB.rmLiquidity
+    rmLiquidity = liftIO . DB.rmLiquidity
 
     swap :: SwapParams -> Handler SwapRes
-    swap = runOnDB . DB.swap
-
-
--- | Auxiliary values.
-runOnDB :: forall a b. IO a -> Handler a
-runOnDB dbAction = liftIO dbAction >>= return
+    swap = liftIO . DB.swap

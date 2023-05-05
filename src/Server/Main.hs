@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 import Network.Wai.Handler.Warp ( defaultSettings
                                 , runSettings
                                 , setPort

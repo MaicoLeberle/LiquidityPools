@@ -1,11 +1,7 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE LambdaCase         #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TypeApplications   #-}
-{-# LANGUAGE RecordWildCards    #-}
-{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications  #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE RankNTypes        #-}
 
 module Server.Database where
 
@@ -38,7 +34,7 @@ pools :: IO GetPoolsRes
 pools = runTransaction trans
   where
     trans :: Connection -> Transaction [Pool]
-    trans conn = liftedQuery_ @PoolRow conn selectQ >>= return . map fromPoolRow
+    trans conn = map fromPoolRow <$> liftedQuery_ @PoolRow conn selectQ
 
     selectQ :: Query
     selectQ = fromString $ concat [ "SELECT pool.key, "
@@ -55,7 +51,7 @@ subscribe :: IO SubscribeRes
 subscribe = runTransaction trans
   where
     trans :: Connection -> Transaction Password
-    trans conn = do newID <- liftIO $ B.createUserID
+    trans conn = do newID <- liftIO B.createUserID
                     liftedExecute @(Only String) conn insertQ (Only newID)
                     return newID
 
@@ -97,12 +93,9 @@ createPool cpp@CreatePoolParams{ cppLiq =
                                       }
                                , ..
                                }
-    | wrongParams = return $ Left "Cannot create pool, wrong params."
+    | newA <= 0 || newB <= 0 = return $ Left "Cannot create pool, wrong params."
     | otherwise = runTransaction trans
   where
-    wrongParams :: Bool
-    wrongParams = newA <= 0 || newB <= 0
-
     trans :: Connection -> Transaction Integer
     trans conn = do checkUserExists conn cppPassword
                     insertPool
@@ -349,7 +342,7 @@ addAssetToUser pass Asset{..} conn = findAssetEntry >>= updateAsset
         assets <- liftedQuery @(Currency, Password) @(Only Integer)
                               conn findAssetEntryQ (aName, pass)
         case assets of
-            []           -> return $ Nothing
+            []           -> return Nothing
             [Only asset] -> return $ Just asset
             manyAssets   -> except $ Left "Ill-formed account, fix manually"
 
@@ -389,8 +382,8 @@ addAssetToUser pass Asset{..} conn = findAssetEntry >>= updateAsset
 
 
 rmAssetFromUser :: Password -> Asset -> Connection -> Transaction ()
-rmAssetFromUser pass a@Asset{aAmount = amount} conn =
-    addAssetToUser pass a{aAmount = -amount} conn
+rmAssetFromUser pass a@Asset{aAmount = amount} = addAssetToUser
+                                                      pass a{aAmount = -amount}
 
 addTokensToPool :: Connection
                 -> Integer
@@ -491,7 +484,7 @@ addTokensToUser conn pass poolID tokens = ifM tokensExist update insert
                                conn updateUserTokensQ (tokens, poolID, pass)
         if rows == 1
         then return ()
-        else except $ Left $ "Could not update liquidity tokens for user."
+        else except $ Left "Could not update liquidity tokens for user."
 
     insert :: Transaction ()
     insert = do

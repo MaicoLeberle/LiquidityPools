@@ -2,7 +2,6 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE InstanceSigs       #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 module Types.Database
     (   -- | Used to compose/sequence actions on the database.
@@ -204,7 +203,7 @@ instance FromField Currency where
     fromField f Nothing = returnError UnexpectedNull f "Unexpected null."
     fromField f (Just bs) =
         case toMaybeCurrency bs of
-            Nothing -> returnError ConversionFailed f $ "Conversion failed."
+            Nothing -> returnError ConversionFailed f "Conversion failed."
             Just res -> return res
       where
         toMaybeCurrency :: (Eq p, IsString p) => p -> Maybe Currency
