@@ -44,12 +44,11 @@ initialTokens newA newB = floor $ sqrt $ fromInteger $ newA * newB
     In particular, note that we assume here that asset `aAssetA` will be added
     entirely to the liquidity of the pool, while only an appropriate amount of
     asset aAssetB will be added in order to preserve the constant factor
-    invariant. In some cases, however, this may not be correct direction of
-    restrictions, as we might need to proceed in the inverse direction: adding
-    the entire asset `aAssetB` and only an appropriate amount of asset `aAssetA`
-    to preserve the invariant. Consider, for example, the equation for
-    `aBAmount`, where the underlying notion of alpha, according to the
-    terminology used in the theoretical foundations for constant factor
+    invariant. In some cases, however, the restriction should take the inverse
+    direction, namely adding the entire asset `aAssetB` and only an appropriate
+    amount of asset `aAssetA` to preserve the invariant. Consider, for example,
+    the equation for `aBAmount`, where the underlying notion of alpha, according
+    to the terminology used in the theoretical foundations for constant factor
     automated market makers, clearly assumes that the proportion between assets
     will be preserved simply by restricting the amount of asset `aAssetB` that
     is effectively added. A similar incorrect approach is taken for the
